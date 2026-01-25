@@ -1,0 +1,27 @@
+.chatbot-container {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+  border: 1px solid #e0e6ed;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.chatbot-header {
+  background: linear-gradient(135deg, #7ca982, #5d8aa8);
+  color: white;
+  padding: 15px 20px;
+}
+
+.chatbot-header h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.2rem;
+}
+
+.chatbot-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}

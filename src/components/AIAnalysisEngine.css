@@ -1,0 +1,281 @@
+.ai-analysis-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.ai-analysis-container h2 {
+  text-align: center;
+  color: #5d6c7c;
+  margin-bottom: 30px;
+  font-size: 1.8rem;
+}
+
+.score-overview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+
+.overall-score {
+  text-align: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.score-circle {
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 15px;
+  position: relative;
+}
+
+.circular-chart {
+  width: 150px;
+  height: 150px;
+}
+
+.circle-bg {
+  stroke: #e0e6ed;
+}
+
+.circle {
+  stroke: #7ca982;
+  stroke-linecap: round;
+  animation: progress 1s ease-out forwards;
+}
+
+@keyframes progress {
+  0% {
+    stroke-dasharray: 0 100;
+  }
+}
+
+.percentage-text {
+  fill: #5d6c7c;
+  font-size: 24px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.score-label {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #5d6c7c;
+}
+
+.detailed-scores {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  flex: 2;
+  min-width: 300px;
+}
+
+.score-card {
+  background-color: #f0f4f8;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  min-width: 100px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  transition: transform 0.3s ease;
+}
+
+.score-card:hover {
+  transform: translateY(-5px);
+}
+
+.score-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #7ca982;
+  margin-bottom: 5px;
+}
+
+.score-title {
+  font-size: 0.9rem;
+  color: #8fa4b8;
+}
+
+.analysis-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f8fafc;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.analysis-section h3 {
+  color: #5d6c7c;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e0e6ed;
+}
+
+.analysis-section h4 {
+  color: #7ca982;
+  margin-bottom: 10px;
+}
+
+.strengths-list, .weaknesses-list, .suggestions-list {
+  padding-left: 20px;
+}
+
+.strength-item {
+  color: #2a9d8f;
+  margin-bottom: 8px;
+  padding: 8px 0;
+}
+
+.weakness-item {
+  color: #e76f51;
+  margin-bottom: 8px;
+  padding: 8px 0;
+}
+
+.suggestion-item {
+  margin-bottom: 10px;
+  padding: 8px 0;
+  color: #5d6c7c;
+  line-height: 1.5;
+}
+
+.keyword-analysis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.matched-keywords, .missing-keywords {
+  flex: 1;
+  min-width: 250px;
+}
+
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.keyword-tag {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.keyword-tag.matched {
+  background-color: #d4edda;
+  color: #2a9d8f;
+  border: 1px solid #c3e6cb;
+}
+
+.keyword-tag.missing {
+  background-color: #f8d7da;
+  color: #e76f51;
+  border: 1px solid #f5c6cb;
+}
+
+.ai-analysis-loading {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid #e0e6ed;
+  border-top: 5px solid #7ca982;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.subtext {
+  color: #8fa4b8;
+  font-style: italic;
+}
+
+/* Additional styles for enhanced analysis */
+.industry-rec-list {
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+.industry-rec-item {
+  color: #5d6c7c;
+  margin-bottom: 8px;
+  padding: 8px 0;
+  line-height: 1.5;
+}
+
+.trending-keywords {
+  margin-top: 15px;
+}
+
+.keyword-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.keyword-chip {
+  background-color: #e0e6ed;
+  color: #5d6c7c;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.custom-feedback {
+  background-color: #f8fafc;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #7ca982;
+}
+
+.feedback-text {
+  margin-top: 10px;
+  color: #5d6c7c;
+  line-height: 1.6;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .score-overview {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 40px;
+  }
+  
+  .detailed-scores {
+    justify-content: space-around;
+  }
+  
+  .analysis-section {
+    padding: 15px;
+  }
+  
+  .keyword-analysis {
+    flex-direction: column;
+  }
+}

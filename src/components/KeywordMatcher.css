@@ -1,0 +1,261 @@
+.keyword-matcher-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.keyword-matcher-container h2 {
+  text-align: center;
+  color: #5d6c7c;
+  margin-bottom: 10px;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  text-align: center;
+  color: #8fa4b8;
+  margin-bottom: 30px;
+  font-size: 1.1rem;
+}
+
+.input-section {
+  margin-bottom: 30px;
+}
+
+.job-description-input {
+  margin-bottom: 20px;
+}
+
+.job-description-input label {
+  display: block;
+  margin-bottom: 8px;
+  color: #5d6c7c;
+  font-weight: 500;
+}
+
+.job-description-input textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #a3b1c6;
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 150px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.job-description-input textarea:focus {
+  outline: none;
+  border-color: #7ca982;
+  box-shadow: 0 0 0 3px rgba(124, 169, 130, 0.2);
+}
+
+.sample-btn {
+  background-color: #a3b1c6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  transition: background-color 0.3s;
+}
+
+.sample-btn:hover {
+  background-color: #8fa4b8;
+}
+
+.analyze-btn {
+  background-color: #7ca982;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: block;
+  margin: 0 auto;
+  transition: background-color 0.3s;
+}
+
+.analyze-btn:hover:not(:disabled) {
+  background-color: #6a9a72;
+}
+
+.analyze-btn:disabled {
+  background-color: #c5d0e0;
+  cursor: not-allowed;
+}
+
+.results-section {
+  background-color: #f8fafc;
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.match-summary {
+  margin-bottom: 30px;
+}
+
+.match-score h3 {
+  color: #5d6c7c;
+  margin-bottom: 8px;
+  font-size: 1.5rem;
+}
+
+.match-score p {
+  color: #8fa4b8;
+  margin: 0;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background-color: #e0e6ed;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 15px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #7ca982, #5d8aa8);
+  border-radius: 10px;
+  transition: width 1s ease-in-out;
+  min-width: 0;
+}
+
+.keywords-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+.matched-keywords, .missing-keywords {
+  background-color: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.matched-keywords h3 {
+  color: #2a9d8f;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.missing-keywords h3 {
+  color: #e76f51;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.keyword-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.keyword-card {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 15px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  min-width: 120px;
+  text-align: center;
+}
+
+.keyword-card.matched {
+  background-color: #d4edda;
+  color: #2a9d8f;
+  border: 1px solid #c3e6cb;
+}
+
+.keyword-card.missing {
+  background-color: #f8d7da;
+  color: #e76f51;
+  border: 1px solid #f5c6cb;
+}
+
+.keyword-status {
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.no-match, .no-missing {
+  color: #8fa4b8;
+  font-style: italic;
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+}
+
+.recommendations {
+  background-color: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.recommendations h3 {
+  color: #5d6c7c;
+  margin-bottom: 15px;
+}
+
+.recommendations ul {
+  padding-left: 20px;
+}
+
+.recommendations li {
+  margin-bottom: 10px;
+  color: #5d6c7c;
+  line-height: 1.5;
+}
+
+.info-panel {
+  background-color: #f0f7ff;
+  border-radius: 10px;
+  padding: 25px;
+  margin-top: 30px;
+}
+
+.info-panel h3 {
+  color: #5d6c7c;
+  margin-bottom: 15px;
+}
+
+.info-panel ul {
+  padding-left: 20px;
+}
+
+.info-panel li {
+  margin-bottom: 10px;
+  color: #5d6c7c;
+  line-height: 1.5;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .keywords-section {
+    grid-template-columns: 1fr;
+  }
+  
+  .keyword-matcher-container {
+    padding: 15px;
+  }
+  
+  .match-summary {
+    text-align: center;
+  }
+}
