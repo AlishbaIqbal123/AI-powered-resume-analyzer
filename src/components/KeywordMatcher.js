@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { matchKeywords } from '../services/resumeParser';
+import { matchJobDescriptionWithAI } from '../services/aiService';
 import './KeywordMatcher.css';
 
 const KeywordMatcher = ({ resumeData }) => {
@@ -16,10 +16,13 @@ const KeywordMatcher = ({ resumeData }) => {
     setIsAnalyzing(true);
 
     try {
-      const results = await matchKeywords(resumeData, jobDescription);
+      // Use real AI matching
+      const results = await matchJobDescriptionWithAI(resumeData, jobDescription);
       setMatchResults(results);
     } catch (err) {
       console.error('Error analyzing keywords:', err);
+      // Fallback or alert user
+      alert("Failed to analyze with AI. Check API Key or try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -43,7 +46,7 @@ const KeywordMatcher = ({ resumeData }) => {
     <div className="keyword-matcher-container">
       <h2>Keyword Matching Tool</h2>
       <p className="subtitle">Compare your resume against job descriptions to identify matching keywords and improvement opportunities</p>
-      
+
       <div className="input-section">
         <div className="job-description-input">
           <label htmlFor="job-desc">Job Description:</label>
@@ -58,9 +61,9 @@ const KeywordMatcher = ({ resumeData }) => {
             Load Sample Job Description
           </button>
         </div>
-        
-        <button 
-          className="analyze-btn" 
+
+        <button
+          className="analyze-btn"
           onClick={analyzeKeywords}
           disabled={isAnalyzing || !jobDescription.trim()}
         >
@@ -75,10 +78,10 @@ const KeywordMatcher = ({ resumeData }) => {
               <h3>Match Score: {matchResults.matchPercentage}%</h3>
               <p>{matchResults.matched.length} keywords matched out of {matchResults.totalJobKeywords} job requirements</p>
             </div>
-            
+
             <div className="progress-bar-container">
-              <div 
-                className="progress-bar" 
+              <div
+                className="progress-bar"
                 style={{ width: `${matchResults.matchPercentage}%` }}
               ></div>
             </div>

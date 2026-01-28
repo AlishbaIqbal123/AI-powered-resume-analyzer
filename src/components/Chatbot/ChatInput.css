@@ -1,48 +1,77 @@
 .chat-input-form {
-  padding: 15px;
-  background-color: white;
-  border-top: 1px solid #e0e6ed;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--surface-glass-border);
 }
 
 .input-container {
   display: flex;
-  gap: 10px;
+  gap: 1rem;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.input-container:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
 }
 
 .input-container textarea {
   flex: 1;
-  padding: 12px 15px;
-  border: 1px solid #e0e6ed;
-  border-radius: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.8rem 1rem;
   resize: none;
   font-family: inherit;
-  font-size: 1rem;
-  min-height: 40px;
+  font-size: 0.95rem;
   max-height: 100px;
+  min-height: 24px;
+}
+
+.input-container textarea::placeholder {
+  color: var(--text-secondary);
 }
 
 .input-container textarea:focus {
   outline: none;
-  border-color: #7ca982;
-  box-shadow: 0 0 0 2px rgba(124, 169, 130, 0.2);
 }
 
 .send-button {
-  background-color: #7ca982;
+  background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 20px;
-  padding: 10px 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
 .send-button:hover:not(:disabled) {
-  background-color: #6a9a72;
+  transform: scale(1.1);
+  background: var(--secondary-color);
+  box-shadow: 0 0 15px var(--secondary-glow);
 }
 
 .send-button:disabled {
-  background-color: #c5d0e0;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.2);
   cursor: not-allowed;
+}
+
+.send-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
