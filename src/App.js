@@ -4,6 +4,7 @@ import AIAnalysisEngine from './components/AIAnalysisEngine';
 import KeywordMatcher from './components/KeywordMatcher';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
+import ResumeTemplates from './components/ResumeTemplates';
 import './App.css';
 
 function App() {
@@ -26,11 +27,15 @@ function App() {
     setCurrentView('analysis');
   };
 
-  const handleAnalysisComplete = (results) => {
+  const handleAnalysisComplete = React.useCallback((results) => {
     setAnalysisResults(results);
-  };
+  }, []);
 
   const renderCurrentView = () => {
+    if (!resumeData && currentView !== 'upload') {
+      return <ResumeUpload onFileUpload={handleFileUpload} />;
+    }
+
     switch (currentView) {
       case 'upload':
         return (
@@ -54,6 +59,7 @@ function App() {
             <div className="section">
               <AIAnalysisEngine
                 resumeData={resumeData}
+                analysisResults={analysisResults}
                 onAnalysisComplete={handleAnalysisComplete}
               />
             </div>
@@ -88,13 +94,25 @@ function App() {
             </div>
           </div>
         );
+      case 'templates':
+        return (
+          <div className="page-content">
+            <header className="page-header">
+              <h1>Professional Resume Templates</h1>
+              <p>Choose from our collection of ATS-friendly templates designed to make your resume stand out</p>
+            </header>
+            <div className="section">
+              <ResumeTemplates />
+            </div>
+          </div>
+        );
       default:
         return <ResumeUpload onFileUpload={handleFileUpload} />;
     }
   };
 
   return (
-    <div className="App wrapper">
+    <div className="App-wrapper">
       <Sidebar
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -103,7 +121,7 @@ function App() {
         theme={theme}
       />
 
-      <main className="app-main">
+      <main className="app-main fade-in">
         {renderCurrentView()}
 
         <footer className="app-footer">

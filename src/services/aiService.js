@@ -20,302 +20,194 @@ RULES:
 - Focus on "Business Value" provided, not just "Tasks" performed.
 - Always remain contextual to the provided resume data.`;
 
+const callOpenAIWithRetry = async (payload, retries = 1, delay = 500) => {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.status === 429) {
+        console.warn(`Rate limit hit (429). Skipping further attempts.`);
+        throw new Error('Rate limited');
+      }
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      if (i === retries || error.message === 'Rate limited') {
+        throw error;
+      }
+      console.warn(`Request failed. Quick retry in ${delay}ms...`, error.message);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+};
+
 const generateResumeAdvice = async (userMessage, resumeData, analysisResults) => {
   if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is not configured. Please set REACT_APP_OPENAI_API_KEY in your environment variables.');
+    throw new Error('OpenAI API key is not configured.');
   }
 
-  const systemPrompt = `${EXPERT_SYSTEM_PROMPT}
-
-  CHATBOT MODE:
-  The user is asking a question about their resume.
-  - Act as a friendly professional coach.
-  - Answer their question using their specific resume data.
-  `;
-
-  const userPrompt = `
-    Here is the user's resume data (Parsed Text):
-    ${resumeData.rawText || JSON.stringify(resumeData.extractedData || {}, null, 2)}
-    
-    Here is the analysis of their resume: ${JSON.stringify(analysisResults || {}, null, 2)}
-    
-    The user asked: "${userMessage}"
-    
-    Provide specific, actionable advice based on their resume data and the analysis.
-  `;
-
+  // Try to use the backend RAG service first
   try {
-    const response = await fetch(OPENAI_API_URL, {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/ai/advice`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
+        message: userMessage,
+        resumeData,
+        analysisResults
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.data;
+    } else {
+      console.warn('RAG service failed, falling back to direct API call:', response.statusText);
     }
+  } catch (ragError) {
+    console.warn('RAG service error, falling back to direct API call:', ragError);
+  }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+  // Fallback to direct API call
+  const systemPrompt = `${EXPERT_SYSTEM_PROMPT}\n\nCHATBOT MODE: Act as a friendly coach. Answer using user's resume data.`;
+  const userPrompt = `Resume Data: ${resumeData.rawText || JSON.stringify(resumeData.extractedData)}\nAnalysis: ${JSON.stringify(analysisResults)}\nUser Question: "${userMessage}"`;
+
+  try {
+    const content = await callOpenAIWithRetry({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    });
+    return content;
   } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    throw error;
+    console.error('Advice generation failed:', error);
+    return "I'm having trouble connecting to my brain right now (Rate limit or API error). Please try again in a moment!";
   }
 };
 
 const analyzeResumeWithAI = async (resumeData) => {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is missing');
-  }
+  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
 
   const systemPrompt = `${EXPERT_SYSTEM_PROMPT}
-
-  RESUME ANALYSIS MODE:
-  Evaluate this resume for software engineering roles.
+  RESUME ANALYSIS MODE: Return a valid JSON object ONLY.
   
-  CRITICAL: You MUST return a valid JSON object with this EXACT structure. Do not return markdown.
+  SCORING SCHEME (Total 100):
+  - ATS Compatibility (0–30): How well automated systems parse this document.
+  - Keyword Match (0–30): Semantic alignment with industry standards.
+  - Content Quality (0–20): Impactful language and verifiable achievements.
+  - Role Relevance (0–20): Fit for technical software engineering roles.
+  
+  Structure:
   {
-    "overallScore": number (0-100),
-    "formattingScore": number (0-100),
-    "contentScore": number (0-100),
-    "relevanceScore": number (0-100),
+    "overallScore": number,
+    "scores": {
+      "ats": number,
+      "keyword": number,
+      "content": number,
+      "relevance": number
+    },
     "strengths": ["string"],
     "weaknesses": ["string"],
     "suggestions": ["string"],
-    "industrySpecific": {
-      "recommendations": ["string"],
-      "trendingKeywords": ["string"]
-    },
-    "keywordMatches": {
-      "matched": ["string"],
-      "missing": ["string"]
-    },
-    "personalization": {
-      "targetRoleFit": "string",
-      "careerGoalsAlignment": "string",
-      "customFeedback": "string"
-    }
+    "industrySpecific": { "recommendations": ["string"], "trendingKeywords": ["string"] },
+    "keywordMatches": { "matched": ["string"], "missing": ["string"] },
+    "personalization": { "targetRoleFit": "string", "careerGoalsAlignment": "string", "customFeedback": "string" }
   }`;
 
-  const userPrompt = `
-    Here is the full text of the resume:
-    ---
-    ${resumeData.rawText || JSON.stringify(resumeData.extractedData)}
-    ---
-    
-    Please evaluate this resume against modern software engineering standards. Returns raw JSON values.
-  `;
+  const userPrompt = `Resume Text:\n---\n${resumeData.rawText || JSON.stringify(resumeData.extractedData)}\n---`;
 
   try {
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.5,
-        max_tokens: 1500
-      })
+    const content = await callOpenAIWithRetry({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.5,
+      max_tokens: 1500
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
     const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
     return JSON.parse(cleanContent);
   } catch (error) {
-    console.error('Error performing AI analysis:', error);
+    console.error('AI analysis failed:', error);
     throw error;
   }
 };
 
 const matchJobDescriptionWithAI = async (resumeData, jobDescription) => {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is missing');
-  }
+  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
 
-  const systemPrompt = `${EXPERT_SYSTEM_PROMPT}
-
-  JOB MATCHING MODE:
-  Compare the resume against the job requirements.
-  
-  CRITICAL: You MUST return a valid JSON object with this EXACT structure. Do not return markdown.
-  {
-    "matchPercentage": number (0-100),
-    "matched": ["string"],
-    "missing": ["string"],
-    "totalJobKeywords": number,
-    "analysis": "Brief explanation of the fit",
-    "recommendations": ["string"]
-  }`;
-
-  const userPrompt = `
-    RESUME CONTENT:
-    ${resumeData.rawText || JSON.stringify(resumeData.extractedData)}
-    
-    JOB DESCRIPTION:
-    ${jobDescription}
-  `;
+  const systemPrompt = `${EXPERT_SYSTEM_PROMPT}\nJOB MATCHING MODE: Return JSON { "matchPercentage": number, "matched": [], "missing": [], "totalJobKeywords": number, "analysis": "string", "recommendations": [] }`;
+  const userPrompt = `Resume: ${resumeData.rawText || JSON.stringify(resumeData.extractedData)}\nJD: ${jobDescription}`;
 
   try {
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 1000
-      })
+    const content = await callOpenAIWithRetry({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 1000
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
     const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
     return JSON.parse(cleanContent);
   } catch (error) {
-    console.error('Error performing JD matching:', error);
+    console.error('JD matching failed:', error);
     throw error;
   }
 };
 
 const parseStructuredDataWithAI = async (rawText) => {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is missing');
-  }
+  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
 
   const systemPrompt = `${EXPERT_SYSTEM_PROMPT}
-
-  DATA EXTRACTION MODE:
-  Extract ALL information from the resume text into a highly detailed structured JSON.
-  
-  CRITICAL: You MUST find the following contact information accurately:
-  - "name": Full name of the candidate.
-  - "email": Primary email address.
-  - "phone": Contact phone number.
-  - "address": City, State/Country or full address.
-  
-  Scan the beginning of the text carefully for these details as they are often at the top.
-  
-  Return a valid JSON object with this EXACT structure.
-  {
-    "name": "string",
-    "email": "string",
-    "phone": "string",
-    "address": "string",
-    "summary": "string",
-    "experience": [
-      { 
-        "company": "string", 
-        "position": "string", 
-        "duration": "string", 
-        "location": "string", 
-        "description": "string",
-        "responsibilities": ["string"],
-        "technologies": ["string"]
-      }
-    ],
-    "education": [
-      { 
-        "institution": "string", 
-        "degree": "string", 
-        "dates": "string",
-        "gpa": "string",
-        "coursework": ["string"],
-        "honors": ["string"]
-      }
-    ],
-    "skills": {
-      "technical": ["string"],
-      "soft": ["string"]
-    },
-    "projects": [
-      { 
-        "name": "string", 
-        "description": "string", 
-        "technologies": ["string"],
-        "achievements": ["string"],
-        "link": "string"
-      }
-    ],
-    "certifications": [
-      { "name": "string", "issuer": "string", "date": "string" }
-    ],
-    "languages": [
-      { "language": "string", "proficiency": "string" }
-    ],
-    "interests": ["string"]
-  }
-  
-  Be extremely thorough. If a section exists, extract every detail. 
-  Do not include markdown. Return raw JSON only. Use null or empty arrays if data is truly missing.`;
-
-  const userPrompt = `
-    RESUME TEXT:
-    ${rawText}
-  `;
+  DATA EXTRACTION MODE: Extract into JSON. 
+  CRITICAL: 
+  - "address": CITY AND STATE/COUNTRY ONLY. (e.g. "New York, NY" or "London, UK"). 
+  - If no location, return NULL. 
+  - NO placeholders like "[Location]".
+  - NO company names in address field.
+  - "experience": List real jobs with clear titles.
+  - Structure: { "name": null, "email": null, "phone": null, "address": null, "summary": null, "experience": [], "education": [], "skills": { "technical": [], "soft": [] }, "projects": [], "certifications": [], "languages": [], "interests": [] }`;
 
   try {
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.1, // Low temperature for factual extraction
-        max_tokens: 2000
-      })
+    const content = await callOpenAIWithRetry({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: rawText }
+      ],
+      temperature: 0.1,
+      max_tokens: 2500
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
+    // Multi-stage cleaning to handle varied LLM responses
+    const cleanContent = content
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+      .trim();
     return JSON.parse(cleanContent);
   } catch (error) {
-    console.error('Error performing AI extraction:', error);
+    console.error('AI extraction failed:', error);
     throw error;
   }
 };

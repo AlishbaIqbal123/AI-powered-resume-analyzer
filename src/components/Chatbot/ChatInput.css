@@ -1,3 +1,40 @@
+.chat-input-wrapper {
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--surface-glass-border);
+}
+
+.chat-suggestions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 1.5rem 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.chat-suggestions::-webkit-scrollbar {
+  display: none;
+  /* Chrome/Safari */
+}
+
+.suggestion-chip {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: var(--text-primary);
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-chip:hover:not(:disabled) {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+}
+
 .chat-input-form {
   padding: 1.5rem;
   background: rgba(0, 0, 0, 0.2);

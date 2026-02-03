@@ -7,6 +7,8 @@ const KeywordMatcher = ({ resumeData }) => {
   const [matchResults, setMatchResults] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  const [error, setError] = useState(null);
+
   const analyzeKeywords = async () => {
     if (!jobDescription.trim()) {
       alert('Please enter a job description to analyze');
@@ -14,15 +16,46 @@ const KeywordMatcher = ({ resumeData }) => {
     }
 
     setIsAnalyzing(true);
+    setError(null);
+    setMatchResults(null);
 
     try {
-      // Use real AI matching
+      // Try to use the backend AI matching service first
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/ai/match-jd`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            resumeData,
+            jobDescription
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setMatchResults(data.data);
+          return;
+        } else {
+          console.warn('Backend AI service failed, falling back to direct API call:', response.statusText);
+        }
+      } catch (backendError) {
+        console.warn('Backend AI service error, falling back to direct API call:', backendError);
+      }
+      
+      // Fallback to direct API call
       const results = await matchJobDescriptionWithAI(resumeData, jobDescription);
       setMatchResults(results);
     } catch (err) {
       console.error('Error analyzing keywords:', err);
-      // Fallback or alert user
-      alert("Failed to analyze with AI. Check API Key or try again.");
+      let errorMsg = "Failed to analyze with AI. Check your API Key in the settings or try again in a few moments.";
+
+      if (err.message.includes('429')) {
+        errorMsg = "The AI service is currently at its limit (Rate Limit). We tried retrying, but please wait a minute before trying again.";
+      }
+
+      setError(errorMsg);
     } finally {
       setIsAnalyzing(false);
     }
@@ -139,7 +172,18 @@ const KeywordMatcher = ({ resumeData }) => {
         </div>
       )}
 
-      {!matchResults && (
+      {error && (
+        <div className="error-panel">
+          <div className="error-icon">⚠️</div>
+          <div className="error-message">
+            <h3>Matching Encountered an Issue</h3>
+            <p>{error}</p>
+          </div>
+          <button className="retry-btn" onClick={analyzeKeywords}>Retry matching</button>
+        </div>
+      )}
+
+      {!matchResults && !error && (
         <div className="info-panel">
           <h3>How Keyword Matching Works</h3>
           <ul>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FaCloudUploadAlt, FaCheckCircle, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaFileAlt, FaChartLine, FaExclamationTriangle } from 'react-icons/fa';
 import { parseResume } from '../services/resumeParser';
 import { isValidResumeType, isValidResumeSize, formatFileSize } from '../utils/helpers';
 import './ResumeUpload.css';
@@ -11,36 +12,36 @@ const ResumeUpload = ({ onFileUpload }) => {
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
-    
+
     if (selectedFile) {
-      // Validate file type and size using helper functions
       if (!isValidResumeType(selectedFile)) {
         setError('Please upload a PDF or Word document (.docx)');
         return;
       }
-      
+
       if (!isValidResumeSize(selectedFile)) {
         setError('File size exceeds 5MB limit');
         return;
       }
-      
+
       setError('');
       setFile(selectedFile);
-      
-      // Parse file using service
       parseFile(selectedFile);
     }
   };
 
   const parseFile = async (file) => {
     setIsUploading(true);
-    
+    setError('');
     try {
       const parsedData = await parseResume(file);
       setPreviewData(parsedData);
     } catch (err) {
-      setError('Error parsing resume. Please try another file.');
-      console.error(err);
+      console.error("Parsing Failure:", err);
+      // Display the specific error message from the parser if available
+      const message = err.message || 'Error parsing resume. Please ensure the file is not corrupted or password protected.';
+      setError(message);
+      setFile(null); // Reset file on error to let them try again
     } finally {
       setIsUploading(false);
     }
@@ -58,102 +59,122 @@ const ResumeUpload = ({ onFileUpload }) => {
     setError('');
   };
 
+  const onDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      handleFileChange({ target: { files: [droppedFile] } });
+    }
+  };
+
   return (
     <div className="resume-upload-container">
-      <h2>Upload Your Resume</h2>
-      <div className={`upload-area ${file ? 'uploaded' : ''}`}>
-        {!file ? (
+      <div
+        className={`upload-area ${file ? 'uploaded' : ''}`}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        {!file && !isUploading && (
           <div className="upload-prompt">
-            <div className="upload-icon">📁</div>
-            <p>Drag & drop your resume here or click to browse</p>
+            <div className="upload-icon"><FaCloudUploadAlt /></div>
+            <p>Drag and drop your resume here</p>
             <p className="file-types">Supports PDF, DOCX (Max 5MB)</p>
-            <input
-              type="file"
-              id="file-input"
-              accept=".pdf,.doc,.docx"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            <button 
-              className="browse-button" 
-              onClick={() => document.getElementById('file-input').click()}
-            >
+            <label className="browse-button">
               Browse Files
-            </button>
+              <input type="file" accept=".pdf,.doc,.docx" onChange={handleFileChange} style={{ display: 'none' }} />
+            </label>
           </div>
-        ) : (
-          <div className="upload-success">
-            <div className="file-info">
-              <span className="file-name">{file.name}</span>
-              <span className="file-size">Size: {formatFileSize(file.size)}</span>
+        )}
+
+        {isUploading && (
+          <div className="upload-loading">
+            <div className="spinner"></div>
+            <h3>Analyzing your document...</h3>
+            <p className="subtext">AI is extracting your professional profile</p>
+          </div>
+        )}
+
+        {previewData && !isUploading && (
+          <div className="preview-section academic-preview">
+            <div className="preview-header">
+              <div className="success-badge">
+                <span className="badge-icon"><FaCheckCircle /></span>
+                <span className="badge-text">Analysis Complete</span>
+              </div>
+              <h3>Extracted Information</h3>
             </div>
-            
-            {isUploading ? (
-              <div className="uploading-progress">
-                <div className="spinner"></div>
-                <p>Analyzing your resume...</p>
+
+            <div className="contact-info-grid">
+              <div className="info-card">
+                <span className="info-label"><FaUser /> Name</span>
+                <span className="info-value">{previewData.extractedData.name || 'Name Not Detected'}</span>
               </div>
-            ) : previewData ? (
-              <div className="preview-section">
-                <h3>Parsed Resume Data</h3>
-                <div className="parsed-data">
-                  <div className="data-item">
-                    <strong>Name:</strong> {previewData.extractedData.name}
-                  </div>
-                  <div className="data-item">
-                    <strong>Email:</strong> {previewData.extractedData.email}
-                  </div>
-                  <div className="data-item">
-                    <strong>Phone:</strong> {previewData.extractedData.phone}
-                  </div>
-                  <div className="data-item">
-                    <strong>Location:</strong> {previewData.extractedData.address}
-                  </div>
-                  <div className="data-item">
-                    <strong>Technical Skills:</strong> {previewData.extractedData.skills.technical.slice(0, 5).join(', ')}...
-                  </div>
-                  <div className="data-item">
-                    <strong>Experience Count:</strong> {previewData.extractedData.experience.length} positions
-                  </div>
-                  <div className="data-item">
-                    <strong>Education:</strong> {previewData.extractedData.education[0]?.degree || 'Not specified'}
-                  </div>
-                  <div className="data-item">
-                    <strong>Certifications:</strong> {previewData.extractedData.certifications.length} certs
-                  </div>
-                  <div className="data-item">
-                    <strong>Completeness Score:</strong> {Math.round(previewData.extractionMetadata.completenessScore * 100)}%
-                  </div>
-                  <div className="data-item">
-                    <strong>Confidence Level:</strong> {Math.round(previewData.extractionConfidence * 100)}%
-                  </div>
-                  {previewData.extractionMetadata.validationIssues.length > 0 && (
-                    <div className="validation-warning">
-                      <strong>Validation Issues:</strong>
-                      <ul>
-                        {previewData.extractionMetadata.validationIssues.map((issue, index) => (
-                          <li key={index} className="warning-item">⚠️ {issue}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="action-buttons">
-                  <button className="analyze-button" onClick={handleUpload}>
-                    Analyze Resume
-                  </button>
-                  <button className="reset-button" onClick={handleReset}>
-                    Upload Different File
-                  </button>
-                </div>
+              <div className="info-card">
+                <span className="info-label"><FaEnvelope /> Email</span>
+                <span className="info-value">{previewData.extractedData.email || 'Email Not Found'}</span>
               </div>
-            ) : null}
+              <div className="info-card">
+                <span className="info-label"><FaPhone /> Phone</span>
+                <span className="info-value">{previewData.extractedData.phone || 'Phone Not Found'}</span>
+              </div>
+              <div className="info-card">
+                <span className="info-label"><FaMapMarkerAlt /> Location</span>
+                <span className="info-value">{previewData.extractedData.address || 'No Location Detected'}</span>
+              </div>
+            </div>
+
+            <div className="detailed-stats">
+              <div className="stat-item">
+                <span className="stat-label"><FaChartLine /> Experience</span>
+                <span className="stat-value">{previewData.extractedData.experience?.length || 0} Positions</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label"><FaFileAlt /> File Info</span>
+                <span className="stat-value">{formatFileSize(file.size)}</span>
+              </div>
+            </div>
+
+            {previewData.extractionMetadata?.validationIssues?.length > 0 && (
+              <div className="validation-warning glass-panel">
+                <strong><FaExclamationTriangle /> Validation Notices:</strong>
+                <ul>
+                  {previewData.extractionMetadata.validationIssues.map((issue, index) => (
+                    <li key={index}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="action-buttons">
+              <button className="analyze-button glass-button" onClick={handleUpload}>
+                Confirm & Start Deep Analysis
+              </button>
+              <button className="reset-button" onClick={handleReset}>
+                Discard & Retry
+              </button>
+            </div>
+
+            <div className="debug-toggle-container">
+              <button
+                className="debug-button"
+                onClick={() => setFile({ ...file, showRaw: !file.showRaw })}
+              >
+                {file.showRaw ? 'Hide Raw Extraction' : 'View Raw Extracted JSON'}
+              </button>
+              {file.showRaw && (
+                <pre className="raw-json-view">
+                  {JSON.stringify(previewData.extractedData, null, 2)}
+                </pre>
+              )}
+            </div>
           </div>
         )}
       </div>
-      
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message"><FaExclamationTriangle /> {error}</div>}
     </div>
   );
 };
