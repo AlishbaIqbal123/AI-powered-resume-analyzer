@@ -24,6 +24,7 @@ function App() {
 
   const handleFileUpload = (data) => {
     setResumeData(data);
+    setAnalysisResults(null); // Reset results for new upload
     setCurrentView('analysis');
     setIsSidebarOpen(false);
   };
