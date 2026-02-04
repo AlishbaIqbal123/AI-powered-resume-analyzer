@@ -1,10 +1,13 @@
-const OpenAI = require('openai');
-const { OPENAI_API_KEY } = process.env;
-
-const client = new OpenAI({
-  apiKey: OPENAI_API_KEY
-});
-
+const {
+  parseStructuredDataWithAI: aiDataExtractor,
+  analyzeResumeWithAI: aiAnalyzer,
+  matchJobDescriptionWithAI: aiMatcher,
+  generateResumeAdvice
+} = require('./aiService');
+const Resume = require('../models/Resume');
+const { GEMINI_API_KEY } = process.env;
+console.log("ResumeParser Service initialized. API Key Present:", !!GEMINI_API_KEY);
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 /**
  * Resume Parser Service
  * Handles parsing of resume files (PDF, DOCX) to extract structured data
@@ -24,13 +27,13 @@ const parseResume = async (fileData) => {
     let aiExtractedData = {};
 
     // 1. Try AI Extraction (Best Quality)
-    if (OPENAI_API_KEY) {
+    if (GEMINI_API_KEY && typeof aiDataExtractor === 'function') {
       try {
-        console.log("Starting AI Data Extraction...");
-        aiExtractedData = await parseStructuredDataWithAI(fileContent);
-        console.log("AI Extraction Complete", aiExtractedData);
+        console.log("Starting Gemini AI Data Extraction...");
+        aiExtractedData = await aiDataExtractor(fileContent);
+        console.log("Gemini AI Extraction Complete");
       } catch (e) {
-        console.error("AI Extraction failed, falling back to regex:", e);
+        console.error("Gemini Extraction failed, falling back to regex:", e);
       }
     }
 
@@ -111,11 +114,20 @@ const extractNameFromContent = (content) => {
   if (lines.length === 0) return null;
 
   // Strategy 1: Look for prominent name patterns at the top
-  for (let i = 0; i < Math.min(lines.length, 8); i++) {
+  // Increased range to top 20 lines to catch headers with images/logos
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
     const line = lines[i];
 
-    // Skip if it looks like a header or section title
-    if (/^(CURRICULUM|RESUME|CV|CONTACT|PROFILE|EXPERIENCE|ABOUT|EDUCATION|SKILLS|PROJECTS|CERTIFICATES?|AWARDS?|INTERESTS?)/i.test(line)) continue;
+    // Check for explicit name labels
+    if (/^(Name|Candidate Name|Full Name):\s*(.+)/i.test(line)) {
+      const match = line.match(/^(Name|Candidate Name|Full Name):\s*(.+)/i);
+      if (match && match[2].trim().length > 3) {
+        return match[2].trim();
+      }
+    }
+
+    // Skip if it looks like a header or section title, but be careful not to skip names that are just uppercase
+    if (/^(CURRICULUM|RESUME|CV|CONTACT|PROFILE|EXPERIENCE|ABOUT|EDUCATION|SKILLS|PROJECTS|CERTIFICATES?|AWARDS?|INTERESTS?)$/i.test(line)) continue;
 
     // Pattern: Full name with proper capitalization (most common)
     if (/^[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]*)?$/.test(line)) {
@@ -123,7 +135,7 @@ const extractNameFromContent = (content) => {
     }
 
     // Pattern: ALL CAPS name (e.g. JOHN DOE)
-    if (/^[A-Z]+\s+[A-Z]+(?:\s+[A-Z]+)?$/.test(line) && line.split(' ').length <= 4) {
+    if (/^[A-Z]+\s+[A-Z]+(?:\s+[A-Z]+)?$/.test(line) && line.split(' ').length <= 4 && line.length > 5) {
       return line.split(' ').map(word => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
     }
 
@@ -190,6 +202,14 @@ const extractEmailFromFile = (content) => {
     });
 
     return personalEmails[0] || validEmails[0];
+  }
+
+  // Last resort fallback: return any email found by the broad regex if logic above was too strict
+  const broadMatches = content.match(/[\w.-]+@[\w.-]+\.\w+/g);
+  if (broadMatches && broadMatches.length > 0) {
+    // Filter out obviously bad ones
+    const filtered = broadMatches.filter(e => !e.startsWith('.') && !e.endsWith('.') && e.length > 5);
+    if (filtered.length > 0) return filtered[0];
   }
 
   return null;
@@ -347,7 +367,7 @@ const extractLocationFromFile = (content) => {
 
 const extractExperienceFromFile = (content) => {
   // Enhanced experience extraction with better section detection
-  const experienceSectionMatch = content.match(/(?:EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EMPLOYMENT HISTORY)[\s\S]*?(?=(?:EDUCATION|SKILLS|CERTIFICATES?|AWARDS?|PROJECTS|LANGUAGES|INTERESTS?|$))/i);
+  const experienceSectionMatch = content.match(/(?:EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EMPLOYMENT HISTORY|WORKING EXPERIENCE|EMPLOYMENT|CAREER HISTORY)[\s\S]*?(?=(?:EDUCATION|ACADEMIC|SKILLS|CERTIFICATES?|AWARDS?|PROJECTS|LANGUAGES|INTERESTS?|$))/i);
   if (!experienceSectionMatch) return [];
 
   const experienceText = experienceSectionMatch[0];
@@ -383,6 +403,14 @@ const extractExperienceFromFile = (content) => {
       if (lines[i + 1]) searchContext.push(lines[i + 1]);
 
       for (const ctx of searchContext) {
+        // Look for explicit labels (common in academic/government CVs)
+        if (ctx.toLowerCase().startsWith('institute:') || ctx.toLowerCase().startsWith('organization:')) {
+          entry.company = ctx.replace(/^(institute|organization):\s*/i, '').trim();
+        }
+        if (ctx.toLowerCase().startsWith('job title:') || ctx.toLowerCase().startsWith('position:')) {
+          entry.position = ctx.replace(/^(job title|position):\s*/i, '').trim();
+        }
+
         // Look for 'at' pattern (e.g., 'Software Engineer at Google')
         const atPattern = /^(.*?)\s+at\s+(.+)$/i;
         const atMatch = ctx.match(atPattern);
@@ -476,139 +504,78 @@ const extractExperienceFromFile = (content) => {
 
 // Extract education details
 const extractEducationFromFile = (content) => {
-  const educationSectionMatch = content.match(/(EDUCATION|ACADEMIC BACKGROUND|EDUCATIONAL BACKGROUND|ACADEMIC QUALIFICATIONS)[\s\S]*?(?=EXPERIENCE|SKILLS|CERTIFICATES?|AWARDS?|PROJECTS|LANGUAGES|INTERESTS?|$)/i);
+  const educationSectionMatch = content.match(/(EDUCATION|ACADEMIC BACKGROUND|EDUCATIONAL BACKGROUND|ACADEMIC QUALIFICATIONS|ACADEMIC INFORMATION|STUDIES|QUALIFICATIONS)[\s\S]*?(?=EXPERIENCE|WORKING|SKILLS|CERTIFICATES?|AWARDS?|PROJECTS|LANGUAGES|INTERESTS?|$)/i);
 
   if (!educationSectionMatch) {
     return [];
   }
 
   const educationText = educationSectionMatch[0];
-  const educationEntries = [];
-  const lines = educationText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+  const lines = educationText.split('\n').map(l => l.trim().replace(/^[-*•]\s*/, '')).filter(l => l.length > 2); // Clean bullets
+  const entries = [];
 
-  // Define common degree keywords to help identify degrees
   const degreeKeywords = [
     'Bachelor', 'Master', 'PhD', 'Doctorate', 'Associate', 'Degree', 'Diploma', 'Certificate',
-    'BS', 'BA', 'MS', 'MA', 'PhD', 'MBA', 'BSc', 'MSc', 'MD', 'JD', 'BEng', 'MEng'
+    'BS', 'BA', 'MS', 'MA', 'BSc', 'MSc', 'MBA', 'B.Sc', 'M.Sc', 'B.E', 'M.E'
   ];
 
-  // Define common school/university keywords
   const schoolKeywords = [
-    'University', 'College', 'School', 'Institute', 'Academy', 'Campus', 'Polytechnic'
+    'University', 'College', 'School', 'Institute', 'Academy', 'Campus', 'Polytechnic', 'Faculty'
   ];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  let currentEntry = {};
 
-    // Look for lines that contain education-related information
-    if (degreeKeywords.some(keyword => line.includes(keyword)) ||
-      schoolKeywords.some(keyword => line.includes(keyword))) {
+  const isDate = (text) => /\b((?:19|20)\d{2}|Present|Current)\b/i.test(text);
+  const isDegree = (text) => degreeKeywords.some(kw => text.toUpperCase().replace('.', '') === kw.toUpperCase() || text.includes(kw));
+  const isSchool = (text) => schoolKeywords.some(kw => text.includes(kw)) || /^Institute:/i.test(text);
 
-      const entry = {
-        institution: null,
-        degree: null,
-        dates: null
-      };
-
-      // Try to extract dates (years, months, etc.)
-      const datePattern = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December|\d{4})\s*[-\u2013\u2014\s]+(?:\d{4}|Present|Current)\b/gi;
-      const dateMatch = line.match(datePattern);
-      if (dateMatch) {
-        entry.dates = dateMatch[0];
+  lines.forEach(line => {
+    // If line matches start of new entry (School), push old and start new
+    if (isSchool(line)) {
+      if (currentEntry.institution || currentEntry.degree) {
+        entries.push(currentEntry);
       }
-
-      // Look for institution and degree in the current line and nearby lines
-      const searchContext = [];
-      if (lines[i - 1]) searchContext.push(lines[i - 1]);
-      searchContext.push(line);
-      if (lines[i + 1]) searchContext.push(lines[i + 1]);
-
-      for (const ctx of searchContext) {
-        // Look for 'at' pattern (e.g., 'Bachelor of Science at University')
-        const atPattern = /^(.*?)\s+at\s+(.+)$/i;
-        const atMatch = ctx.match(atPattern);
-        if (atMatch) {
-          entry.degree = atMatch[1].trim();
-          entry.institution = atMatch[2].trim();
-          break;
-        }
-
-        // Look for '|' or '-' pattern (e.g., 'University | Bachelor of Science')
-        const separatorPattern = /^(.*?)\s*[|\-]\s*(.+)$/;
-        const sepMatch = ctx.match(separatorPattern);
-        if (sepMatch) {
-          const part1 = sepMatch[1].trim();
-          const part2 = sepMatch[2].trim();
-
-          // Determine which is institution and which is degree based on keywords
-          const part1Lower = part1.toLowerCase();
-          const part2Lower = part2.toLowerCase();
-
-          const part1HasDegree = degreeKeywords.some(keyword => part1Lower.includes(keyword.toLowerCase()));
-          const part2HasDegree = degreeKeywords.some(keyword => part2Lower.includes(keyword.toLowerCase()));
-          const part1HasSchool = schoolKeywords.some(keyword => part1Lower.includes(keyword.toLowerCase()));
-          const part2HasSchool = schoolKeywords.some(keyword => part2Lower.includes(keyword.toLowerCase()));
-
-          if (part1HasDegree || part2HasSchool) {
-            entry.degree = part1;
-            entry.institution = part2;
-          } else if (part2HasDegree || part1HasSchool) {
-            entry.degree = part2;
-            entry.institution = part1;
-          } else {
-            // Default assignment
-            if (part1HasSchool || part2HasDegree) {
-              entry.institution = part1;
-              entry.degree = part2;
-            } else {
-              entry.institution = part2;
-              entry.degree = part1;
-            }
-          }
-          break;
-        }
-
-        // If we find a clear degree or institution pattern
-        if (!entry.degree && degreeKeywords.some(keyword => ctx.includes(keyword))) {
-          entry.degree = ctx;
-        } else if (!entry.institution && schoolKeywords.some(keyword => ctx.includes(keyword))) {
-          entry.institution = ctx;
-        }
-      }
-
-      // If we didn't find institution but found school-related text, use it
-      if (!entry.institution) {
-        for (const ctx of searchContext) {
-          if (schoolKeywords.some(keyword => ctx.includes(keyword)) &&
-            !degreeKeywords.some(keyword => ctx.includes(keyword))) {
-            entry.institution = ctx;
-            break;
-          }
-        }
-      }
-
-      // If we didn't find degree but found degree-related text, use it
-      if (!entry.degree) {
-        for (const ctx of searchContext) {
-          if (degreeKeywords.some(keyword => ctx.includes(keyword))) {
-            entry.degree = ctx;
-            break;
-          }
-        }
-      }
-
-      // Add to entries if we have meaningful data
-      if (entry.institution || entry.degree) {
-        educationEntries.push({
-          institution: entry.institution || 'Institution Not Specified',
-          degree: entry.degree || 'Degree Not Specified',
-          dates: entry.dates || 'Dates Not Specified'
-        });
-      }
+      currentEntry = { institution: line, degree: null, dates: null };
+      return;
     }
+
+    // Checking for degree
+    if (isDegree(line)) {
+      if (currentEntry.degree) {
+        // If we already have a degree, this might be a second degree or new entry
+        // If we have an institution, assume it's a new entry (unless double major?)
+        // Let's assume new entry if we have institution
+        if (currentEntry.institution) {
+          entries.push(currentEntry);
+          currentEntry = { institution: null, degree: line, dates: null };
+        } else {
+          // Replace/Append? Let's just update for now (simple)
+          currentEntry.degree = line;
+        }
+      } else {
+        currentEntry.degree = line;
+      }
+      return;
+    }
+
+    // Checking for date
+    if (isDate(line)) {
+      // Only if we don't have a date yet, or overwrite?
+      currentEntry.dates = line;
+      return;
+    }
+  });
+
+  // Push final entry
+  if (currentEntry.institution || currentEntry.degree) {
+    entries.push(currentEntry);
   }
 
-  return educationEntries;
+  return entries.map(e => ({
+    institution: e.institution || 'Institution Not Specified',
+    degree: e.degree || 'Degree Not Specified',
+    dates: e.dates || 'Dates Not Specified'
+  }));
 };
 
 // Extract technical skills
@@ -640,9 +607,14 @@ const extractTechnicalSkillsFromFile = (content) => {
       extractedSkills.forEach(skill => {
         const cleanSkill = skill.trim().replace(/[.]+$/, ''); // Remove trailing dots
         if (cleanSkill && cleanSkill.length > 1) {
-          // Normalize skill names
+          // Normalize skill names and filter noise
           const normalizedSkill = cleanSkill.charAt(0).toUpperCase() + cleanSkill.slice(1).toLowerCase();
-          skills.add(normalizedSkill);
+
+          // Noise filter: Blacklist degrees and common labels
+          const blacklist = ['Msc', 'Bsc', 'M.sc', 'B.sc', 'Mphil', 'M.phil', 'Phd', 'Doctorate', 'Degree', 'Duration', 'Experience', 'Job', 'Title', 'Institute', 'Mathematics', 'Teaching'];
+          if (!blacklist.includes(normalizedSkill)) {
+            skills.add(normalizedSkill);
+          }
         }
       });
     }
@@ -672,11 +644,15 @@ const extractTechnicalSkillsFromFile = (content) => {
 
   // Check for presence of common skills in the content
   commonTechSkills.forEach(skill => {
-    // Properly escape special regex characters including + signs
-    const escapedSkill = skill.replace(/[.*+?^${}()[\]|]/g, '\$&');
-    const skillRegex = new RegExp('\\b' + escapedSkill + '\\b', 'gi');
-    if (skillRegex.test(content)) {
-      skills.add(skill);
+    try {
+      // Properly escape special regex characters including + signs
+      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const skillRegex = new RegExp('\\b' + escapedSkill + '\\b', 'gi');
+      if (skillRegex.test(content)) {
+        skills.add(skill);
+      }
+    } catch (err) {
+      console.warn(`Skipping invalid regex for technical skill: ${skill}`, err);
     }
   });
 
@@ -702,10 +678,15 @@ const extractSoftSkillsFromFile = (content) => {
 
   // Check for presence of common soft skills in the content
   commonSoftSkills.forEach(skill => {
-    // Properly escape special regex characters including + signs
-    const skillRegex = new RegExp('\\b' + skill.replace(/[.*+?^${}()[\]|]/g, '\$&') + '\\b', 'gi');
-    if (skillRegex.test(content)) {
-      softSkills.add(skill);
+    try {
+      // Properly escape special regex characters including + signs
+      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const skillRegex = new RegExp('\\b' + escapedSkill + '\\b', 'gi');
+      if (skillRegex.test(content)) {
+        softSkills.add(skill);
+      }
+    } catch (err) {
+      console.warn(`Skipping invalid regex for soft skill: ${skill}`, err);
     }
   });
 
@@ -716,7 +697,8 @@ const extractSoftSkillsFromFile = (content) => {
     const skillsText = skillsSectionMatch[0];
     commonSoftSkills.forEach(skill => {
       // Properly escape special regex characters including + signs
-      const skillRegex = new RegExp('\\b' + skill.replace(/[.*+?^${}()[\]|]/g, '\$&') + '\\b', 'gi');
+      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const skillRegex = new RegExp('\\b' + escapedSkill + '\\b', 'gi');
       if (skillRegex.test(skillsText)) {
         softSkills.add(skill);
       }
@@ -757,7 +739,7 @@ const extractCertificationsFromFile = (content) => {
 
 // Extract summary/objective
 const extractSummaryFromFile = (content) => {
-  const summarySectionMatch = content.match(/(SUMMARY|OBJECTIVE|PROFESSIONAL SUMMARY|CAREER SUMMARY)[\s\S]*?(?=EXPERIENCE|EDUCATION|SKILLS|CERTIFICATES|PROJECTS|$)/i);
+  const summarySectionMatch = content.match(/(SUMMARY|OBJECTIVE|PROFESSIONAL SUMMARY|CAREER SUMMARY|CAREER OBJECTIVES|PERSONAL PROFILE|ABOUT ME)[\s\S]*?(?=EXPERIENCE|WORKING|EDUCATION|ACADEMIC|SKILLS|CERTIFICATES|PROJECTS|$)/i);
 
   if (!summarySectionMatch) {
     // Return default if no summary section found
@@ -774,30 +756,70 @@ const extractSummaryFromFile = (content) => {
 
 // Extract projects
 const extractProjectsFromFile = (content) => {
-  const projectsSectionMatch = content.match(/(PROJECTS|KEY PROJECTS|RELEVANT PROJECTS)[\s\S]*?(?=EXPERIENCE|EDUCATION|SKILLS|CERTIFICATES|SUMMARY|$)/i);
+  const projectsSectionMatch = content.match(/(PROJECTS|KEY PROJECTS|RELEVANT PROJECTS|ACADEMIC PROJECTS|RESEARCH PUBLICATION|RESEARCH|PUBLICATIONS)[\s\S]*?(?=EXPERIENCE|EDUCATION|SKILLS|CERTIFICATES|SUMMARY|$)/i);
 
   if (!projectsSectionMatch) {
-    // Return default if no projects section found
     return [];
   }
 
   const projectsText = projectsSectionMatch[0];
-
-  // Extract projects
+  const lines = projectsText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
   const projects = [];
+  let currentProject = {};
 
-  // Pattern for projects
-  const projectPattern = /([A-Za-z\s\-&]+)\s*[:\-]\s*([A-Za-z\s\-&\.,!?\(\)]+)/g; // eslint-disable-line no-useless-escape
-  let match;
+  const startNewProject = (name, description = '') => {
+    if (currentProject.name) {
+      projects.push(currentProject);
+    }
+    currentProject = { name, description: description ? [description] : [] };
+  };
 
-  while ((match = projectPattern.exec(projectsText)) !== null) {
-    projects.push({
-      name: match[1]?.trim(),
-      description: match[2]?.trim()
-    });
+  const isBullet = (line) => /^[-*•]/.test(line);
+
+  lines.forEach(line => {
+    // 1. Check for "Name: Description" format
+    const colonMatch = line.match(/^([A-Za-z0-9\s\-_&]+?)\s*:\s*(.+)$/);
+    if (colonMatch && !isBullet(line) && colonMatch[1].length < 50) {
+      startNewProject(colonMatch[1].trim(), colonMatch[2].trim());
+      return;
+    }
+
+    // 2. Check for "Name | Tech" or "Name - Tech" format
+    const pipeMatch = line.match(/^([A-Za-z0-9\s\-_&]+?)\s*[|\-]\s*(.+)$/);
+    if (pipeMatch && !isBullet(line) && pipeMatch[1].length < 50) {
+      startNewProject(pipeMatch[1].trim(), pipeMatch[2].trim());
+      return;
+    }
+
+    // 3. Check for Bullet points (Description)
+    if (isBullet(line)) {
+      if (currentProject.name) {
+        currentProject.description.push(line.replace(/^[-*•]\s*/, ''));
+      }
+      return;
+    }
+
+    // 4. Short line that looks like a title (and not a keyword like 'Project')
+    if (line.length < 50 && /^[A-Z]/.test(line) && !line.toLowerCase().includes('project')) {
+      startNewProject(line);
+      return;
+    }
+
+    // 5. Append generic text to description if we have a project
+    if (currentProject.name) {
+      currentProject.description.push(line);
+    }
+  });
+
+  if (currentProject.name) {
+    projects.push(currentProject);
   }
 
-  return projects;
+  // Post-process: Join single-line descriptions or keep array
+  return projects.map(p => ({
+    name: p.name,
+    description: p.description.join(' ')
+  }));
 };
 
 // Extract languages
@@ -952,128 +974,245 @@ const validateExtractedData = (parsedData) => {
 const analyzeResume = async (resumeData) => {
   try {
     // Try to use real AI analysis first
-    if (OPENAI_API_KEY) {
-      console.log("Starting Real AI Analysis...");
-      const realAnalysis = await analyzeResumeWithAI(resumeData);
-      console.log("Real AI Analysis Complete:", realAnalysis);
-      return realAnalysis;
-    }
-  } catch (error) {
-    console.error("Real AI Analysis failed, falling back to simulation:", error);
-  }
-
-  // Fallback to simulation if no API key or error
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Advanced analysis results with industry-specific recommendations
-      const analysis = {
-        overallScore: calculateOverallScore(resumeData),
-        strengths: [
-          "Strong technical skills in JavaScript, React, and Node.js",
-          "Good work experience with progressive responsibilities",
-          "Clear chronological work history showing growth",
-          "Relevant projects that demonstrate practical skills",
-          "Additional certifications that enhance credibility"
-        ],
-        weaknesses: [
-          "Summary section could be more compelling and specific",
-          "Missing quantifiable achievements in work experience",
-          "Education section is basic without honors or additional certifications",
-          "Could benefit from more diverse technology stack examples"
-        ],
-        suggestions: generateSuggestions(resumeData),
-        industrySpecific: {
-          targetRole: 'Software Engineer',
-          recommendations: [
-            "Highlight experience with version control systems like Git in your summary",
-            "Emphasize experience with testing frameworks relevant to the role",
-            "Include metrics that show impact of your contributions"
+    const realAnalysis = await aiAnalyzer(resumeData);
+    console.log("AI Analysis Complete:", realAnalysis);
+    return realAnalysis;
+  } catch (aiError) {
+    console.error("AI Analysis failed, falling back to simulation:", aiError);
+    // Fallback to simulation if AI fails
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Advanced analysis results with industry-specific recommendations
+        const analysis = {
+          overallScore: calculateOverallScore(resumeData),
+          scores: {
+            ats: calculateFormattingScore(resumeData),
+            keyword: calculateKeywordScore(resumeData),
+            content: calculateContentScore(resumeData),
+            relevance: calculateRelevanceScore(resumeData)
+          },
+          strengths: [
+            "Strong technical skills in JavaScript, React, and Node.js",
+            "Good work experience with progressive responsibilities",
+            "Clear chronological work history showing growth",
+            "Relevant projects that demonstrate practical skills",
+            "Additional certifications that enhance credibility"
           ],
-          trendingKeywords: [
-            'DevOps', 'Microservices', 'Cloud Computing', 'Agile', 'Scrum',
-            'Continuous Integration', 'Continuous Deployment', 'API Development'
-          ]
-        },
-        keywordMatches: {
-          matched: ['JavaScript', 'React', 'Node.js', 'Python', 'SQL', 'AWS', 'Docker', 'Git'],
-          missing: ['TypeScript', 'GraphQL', 'Kubernetes', 'Jest', 'CI/CD', 'Microservices', 'RESTful APIs']
-        },
-        formattingScore: calculateFormattingScore(resumeData),
-        contentScore: calculateContentScore(resumeData),
-        relevanceScore: calculateRelevanceScore(resumeData),
-        personalization: {
-          careerGoalsAlignment: 'medium',
-          targetRoleFit: 'good',
-          customFeedback: generateCustomFeedback(resumeData)
-        }
-      };
+          weaknesses: [
+            "Summary section could be more compelling and specific",
+            "Missing quantifiable achievements in work experience",
+            "Education section is basic without honors or additional certifications",
+            "Could benefit from more quantifiable achievements in your latest roles"
+          ],
+          improvements: generateDetailedImprovements(resumeData),
+          industrySpecific: {
+            targetRole: resumeData.extractedData.experience[0]?.position || 'Professional',
+            recommendations: [
+              "Tailor your summary to highlight Domain-Specific expertise",
+              "Include metrics that show the tangible impact of your work",
+              "Obtain specialized certifications relevant to your current trajectory"
+            ],
+            trendingKeywords: [
+              'Strategic Leadership', 'Optimization', 'Digital Transformation', 'Analytical Thinking'
+            ]
+          },
+          keywordMatches: {
+            matched: resumeData.extractedData.skills.technical.slice(0, 5),
+            missing: ['Advanced Methodologies', 'Strategic Planning', 'Process Optimization', 'Project Leadership']
+          },
+          formattingScore: calculateFormattingScore(resumeData),
+          contentScore: calculateContentScore(resumeData),
+          relevanceScore: calculateRelevanceScore(resumeData),
+          personalization: {
+            careerGoalsAlignment: 'medium',
+            targetRoleFit: 'good',
+            customFeedback: generateCustomFeedback(resumeData)
+          }
+        };
 
-      resolve(analysis);
-    }, 2500);
-  });
+        resolve(analysis);
+      }, 2500);
+    });
+  }
 };
 
 // Calculate overall score based on multiple factors
 const calculateOverallScore = (resumeData) => {
-  // Base score calculation
-  const baseScore = 75;
+  const ats = calculateFormattingScore(resumeData); // 30
+  const keyword = calculateKeywordScore(resumeData); // 30
+  const content = calculateContentScore(resumeData); // 20
+  const relevance = calculateRelevanceScore(resumeData); // 20
 
-  // Adjustments based on various factors
-  const experienceBonus = Math.min(resumeData.extractedData.experience.length * 5, 20);
-  const educationBonus = resumeData.extractedData.education.length > 0 ? 5 : 0;
-  const skillsBonus = Math.min(resumeData.extractedData.skills.technical.length * 1.5, 15);
-  const certificationsBonus = Math.min(resumeData.extractedData.certifications.length * 2, 10);
-
-  let score = baseScore + experienceBonus + educationBonus + skillsBonus + certificationsBonus;
-
-  // Apply upper limit
-  return Math.min(score, 100);
+  return ats + keyword + content + relevance;
 };
 
-// Calculate formatting score
+// Calculate ATS formatting score (0-30)
 const calculateFormattingScore = (resumeData) => {
-  // Check for proper structure and formatting
-  const hasProfessionalStructure = 10;
-  const hasConsistentFormatting = 10;
-  const hasProperSections = 15;
+  let score = 0;
 
-  return Math.min(hasProfessionalStructure + hasConsistentFormatting + hasProperSections, 100);
-};
-
-// Calculate content score
-const calculateContentScore = (resumeData) => {
-  // Evaluate the quality of content
-  const experienceQuality = 20;
-  const skillsRelevance = 20;
-  const achievementQuantification = 15;
-
-  return experienceQuality + skillsRelevance + achievementQuantification;
-};
-
-// Calculate relevance score
-const calculateRelevanceScore = (resumeData) => {
-  // Check for industry-relevant keywords and skills
-  const keywordsMatched = resumeData.extractedData.skills.technical.length * 2;
-  const experienceRelevance = 15;
-
-  return Math.min(keywordsMatched + experienceRelevance, 100);
-};
-
-// Generate personalized suggestions
-const generateSuggestions = (resumeData) => {
-  const suggestions = [
-    "Add specific metrics to quantify your achievements (e.g., 'increased efficiency by 30%', 'managed team of 5 developers')",
-    "Include relevant certifications or online courses to show continuous learning",
-    "Tailor your summary to the specific role you're targeting",
-    "Emphasize leadership and teamwork experiences more prominently"
-  ];
-
-  // Add role-specific suggestions
-  if (resumeData.extractedData.skills.technical.includes('JavaScript')) {
-    suggestions.push("Consider highlighting your JavaScript framework expertise more prominently");
+  // Check for proper structure (10 points)
+  if (resumeData.extractedData.name && resumeData.extractedData.email) {
+    score += 10;
   }
 
-  return suggestions;
+  // Check for consistent sections (10 points)
+  const sections = resumeData.extractionMetadata?.sectionsIdentified || [];
+  if (sections.length >= 4) {
+    score += 10;
+  } else if (sections.length >= 2) {
+    score += 5;
+  }
+
+  // Check for completeness (10 points)
+  const completeness = resumeData.extractionMetadata?.completenessScore || 0;
+  score += Math.round(completeness * 10);
+
+  return Math.min(score, 30);
+};
+
+// Calculate content quality score (0-20)
+const calculateContentScore = (resumeData) => {
+  let score = 0;
+
+  // Experience quality (8 points)
+  const expCount = resumeData.extractedData.experience.length;
+  if (expCount >= 3) {
+    score += 8;
+  } else if (expCount >= 1) {
+    score += expCount * 2.5;
+  }
+
+  // Skills relevance (7 points)
+  const techSkills = resumeData.extractedData.skills.technical.length;
+  if (techSkills >= 10) {
+    score += 7;
+  } else if (techSkills >= 5) {
+    score += 4;
+  } else if (techSkills > 0) {
+    score += 2;
+  }
+
+  // Additional sections (5 points)
+  if (resumeData.extractedData.projects.length > 0) score += 2;
+  if (resumeData.extractedData.certifications.length > 0) score += 2;
+  if (resumeData.extractedData.summary && resumeData.extractedData.summary.length > 50) score += 1;
+
+  return Math.min(Math.round(score), 20);
+};
+
+// Calculate keyword/relevance score (0-30 for keyword alignment)
+const calculateKeywordScore = (resumeData) => {
+  let score = 0;
+
+  // Technical skills keyword density (15 points)
+  const techSkills = resumeData.extractedData.skills.technical.length;
+  if (techSkills >= 15) {
+    score += 15;
+  } else if (techSkills >= 10) {
+    score += 12;
+  } else if (techSkills >= 5) {
+    score += 8;
+  } else {
+    score += techSkills * 1.5;
+  }
+
+  // Soft skills (5 points)
+  const softSkills = resumeData.extractedData.skills.soft?.length || 0;
+  score += Math.min(softSkills, 5);
+
+  // Industry keywords in experience (10 points)
+  const hasExperience = resumeData.extractedData.experience.length > 0;
+  if (hasExperience) {
+    score += 5;
+    // Check if experience has detailed responsibilities
+    const hasDetails = resumeData.extractedData.experience.some(exp =>
+      exp.responsibilities && exp.responsibilities.length > 0
+    );
+    if (hasDetails) score += 5;
+  }
+
+  return Math.min(Math.round(score), 30);
+};
+
+// Calculate role relevance score (0-20)
+const calculateRelevanceScore = (resumeData) => {
+  let score = 0;
+
+  // Education relevance (5 points)
+  if (resumeData.extractedData.education.length > 0) {
+    score += 5;
+  }
+
+  // Experience relevance (10 points)
+  const expCount = resumeData.extractedData.experience.length;
+  if (expCount >= 3) {
+    score += 10;
+  } else if (expCount >= 1) {
+    score += expCount * 3;
+  }
+
+  // Additional qualifications (5 points)
+  if (resumeData.extractedData.certifications.length > 0) score += 3;
+  if (resumeData.extractedData.projects.length > 0) score += 2;
+
+  return Math.min(Math.round(score), 20);
+};
+
+// Generate detailed improvements with action steps covering specific areas
+const generateDetailedImprovements = (resumeData) => {
+  const improvements = [
+    {
+      action: "Quantify Achievements",
+      priority: "High",
+      details: [
+        "Review your work experience bullet points.",
+        "Add specific metrics like 'Increased performance by 30%' or 'Managed $50k budget'.",
+        "Use numbers to demonstrate the scale and impact of your work."
+      ]
+    },
+    {
+      action: "Enhance Summary",
+      priority: "Medium",
+      details: [
+        "Rewrite your summary to be more targeted towards your desired role.",
+        "Include years of experience, core skills, and key achievements.",
+        "Avoid generic buzzwords; be specific about your value proposition."
+      ]
+    },
+    {
+      action: "Expand Technical Skills",
+      priority: "Medium",
+      details: [
+        "Group your skills into categories (e.g., Languages, Frameworks, Tools).",
+        "Include newer technologies that are in high demand.",
+        "Ensure your skills match the keywords found in job descriptions you are interested in."
+      ]
+    },
+    {
+      action: "Optimize Format",
+      priority: "Low",
+      details: [
+        "Ensure your resume has a clean, consistent layout.",
+        "Use a standard font and appropriate font sizes.",
+        "Check for any alignment issues or typos."
+      ]
+    }
+  ];
+
+  // Add dynamic improvement based on missing keywords if available
+  if (resumeData.extractedData.skills.technical.length < 5) {
+    improvements.push({
+      action: "Add Key Technical Skills",
+      priority: "High",
+      details: [
+        "Your resume seems to lack technical skills. Add relevant languages and tools.",
+        "Look at job descriptions for your target role to identify missing keywords.",
+        "List proficiency levels if applicable."
+      ]
+    });
+  }
+
+  return improvements;
 };
 
 // Generate custom feedback
@@ -1084,40 +1223,62 @@ const generateCustomFeedback = (resumeData) => {
 
 // Simulated keyword matching service
 const matchKeywords = async (resumeData, jobDescription) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Extract keywords from job description and resume
-      const jobKeywords = extractKeywords(jobDescription);
-      const resumeKeywords = resumeData?.extractedData?.skills || [];
+  try {
+    const result = await aiMatcher(resumeData, jobDescription);
+    return result;
+  } catch (aiError) {
+    console.error("Job Description Matching failed, falling back to simulation:", aiError);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Extract keywords from job description and resume
+        const jobKeywords = extractKeywords(jobDescription);
+        const resumeKeywords = [
+          ...(resumeData?.extractedData?.skills?.technical || []),
+          ...(resumeData?.extractedData?.skills?.soft || [])
+        ];
 
-      // Find matches and gaps
-      const matched = resumeKeywords.filter(skill =>
-        jobKeywords.some(keyword =>
-          keyword.toLowerCase().includes(skill.toLowerCase()) ||
-          skill.toLowerCase().includes(keyword.toLowerCase())
-        )
-      );
+        // Find matches and gaps
+        const matched = jobKeywords.filter(keyword =>
+          resumeKeywords.some(skill =>
+            keyword.toLowerCase().includes(skill.toLowerCase()) ||
+            skill.toLowerCase().includes(keyword.toLowerCase())
+          )
+        );
 
-      const missing = jobKeywords.filter(keyword =>
-        !resumeKeywords.some(skill =>
-          keyword.toLowerCase().includes(skill.toLowerCase()) ||
-          skill.toLowerCase().includes(keyword.toLowerCase())
-        )
-      ).slice(0, 10); // Limit to top 10 missing keywords
+        const missing = jobKeywords.filter(keyword =>
+          !resumeKeywords.some(skill =>
+            keyword.toLowerCase().includes(skill.toLowerCase()) ||
+            skill.toLowerCase().includes(keyword.toLowerCase())
+          )
+        ).slice(0, 10); // Limit to top 10 missing keywords
 
-      const matchPercentage = Math.round((matched.length / (matched.length + missing.length)) * 100);
+        const matchPercentage = Math.round((matched.length / (matched.length + missing.length)) * 100) || 0;
 
-      const result = {
-        matchPercentage,
-        matched,
-        missing,
-        totalJobKeywords: jobKeywords.length,
-        totalResumeKeywords: resumeKeywords.length
-      };
+        const recommendations = [
+          `Incorporate ${missing.slice(0, 3).join(', ')} into your skills section to improve ATS visibility.`,
+          `Highlight specific projects where you've used ${matched.slice(0, 2).join(' or ')} to demonstrate deeper expertise.`,
+          `Tailor your professional summary to mention your experience with ${jobKeywords.slice(0, 2).join(' and ')}.`
+        ];
 
-      resolve(result);
-    }, 1500);
-  });
+        // Ensure at least 3 recommendations
+        while (recommendations.length < 3) {
+          recommendations.push("Optimize your resume layout for better scannability by using bullet points.");
+        }
+
+        const result = {
+          matchPercentage,
+          matched,
+          missing,
+          totalJobKeywords: jobKeywords.length,
+          totalResumeKeywords: resumeKeywords.length,
+          analysis: `Your profile has a ${matchPercentage}% semantic alignment with this role. You have strong matches in ${matched.slice(0, 3).join(', ')} but there are critical gaps in ${missing.slice(0, 3).join(', ')}.`,
+          recommendations: recommendations
+        };
+
+        resolve(result);
+      }, 1500);
+    });
+  }
 };
 
 // Helper function to extract keywords
@@ -1136,341 +1297,85 @@ const extractKeywords = (text) => {
   return commonKeywords.filter(keyword => lowerText.includes(keyword));
 };
 
-// AI-powered analysis functions
 const analyzeResumeWithAI = async (resumeData) => {
-  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
-
-  const systemPrompt = `You are an elite AI Resume Analyzer and Career Coach with 15+ years of experience in technical recruiting for Fortune 500 tech companies.
-
-Your mission is to transform user resumes into interview-winning documents. You analyze resumes from three critical perspectives:
-1. ATS (Applicant Tracking Systems): Ensuring high keyword density and proper formatting for automated filters.
-2. Recruiters: Quick scannability, clear visual hierarchy, and immediate impact demonstration.
-3. Hiring Managers: Deep technical competency, problem-solving abilities, and quantifiable business impact.
-
-Your specific evaluation criteria:
-- IMPACT: Are achievements quantified with metrics? (e.g., "Increased performance by 40%").
-- STACK: Is the technical stack modern and clearly categorized?
-- CLARITY: Is the writing professional, concise, and punchy?
-- RELEVANCE: Is the resume tailored for software engineering and related technical roles?
-
-RULES:
-- Be brutally honest but professionally constructive. 
-- Provide elite-level feedback that a candidate would pay thousands for.
-- Prioritize Action Verbs (Developed, Orchestrated, Optimized, Scaled).
-- Focus on "Business Value" provided, not just "Tasks" performed.
-- Always remain contextual to the provided resume data.
-
-RESUME ANALYSIS MODE: Return a valid JSON object ONLY.
-
-SCORING SCHEME (Total 100):
-- ATS Compatibility (0–30): How well automated systems parse this document.
-- Keyword Match (0–30): Semantic alignment with industry standards.
-- Content Quality (0–20): Impactful language and verifiable achievements.
-- Role Relevance (0–20): Fit for technical software engineering roles.
-
-Structure:
-{
-  "overallScore": number,
-  "scores": {
-    "ats": number,
-    "keyword": number,
-    "content": number,
-    "relevance": number
-  },
-  "strengths": ["string"],
-  "weaknesses": ["string"],
-  "suggestions": ["string"],
-  "industrySpecific": { "recommendations": ["string"], "trendingKeywords": ["string"] },
-  "keywordMatches": { "matched": ["string"], "missing": ["string"] },
-  "personalization": { "targetRoleFit": "string", "careerGoalsAlignment": "string", "customFeedback": "string" }
-}`;
-
-  const userPrompt = `Resume Text:\n---\n${resumeData.rawText || JSON.stringify(resumeData.extractedData)}\n---`;
-
-  try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 1500
-    });
-
-    const content = response.choices[0].message.content;
-    const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanContent);
-  } catch (error) {
-    console.error('AI analysis failed:', error);
-    throw error;
-  }
+  return aiAnalyzer(resumeData);
 };
 
 const matchJobDescriptionWithAI = async (resumeData, jobDescription) => {
-  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
+  return aiMatcher(resumeData, jobDescription);
+};
 
-  const systemPrompt = `You are an elite AI Resume Analyzer and Career Coach with 15+ years of experience in technical recruiting for Fortune 500 tech companies.
-
-Your mission is to transform user resumes into interview-winning documents. You analyze resumes from three critical perspectives:
-1. ATS (Applicant Tracking Systems): Ensuring high keyword density and proper formatting for automated filters.
-2. Recruiters: Quick scannability, clear visual hierarchy, and immediate impact demonstration.
-3. Hiring Managers: Deep technical competency, problem-solving abilities, and quantifiable business impact.
-
-Your specific evaluation criteria:
-- IMPACT: Are achievements quantified with metrics? (e.g., "Increased performance by 40%").
-- STACK: Is the technical stack modern and clearly categorized?
-- CLARITY: Is the writing professional, concise, and punchy?
-- RELEVANCE: Is the resume tailored for software engineering and related technical roles?
-
-RULES:
-- Be brutally honest but professionally constructive. 
-- Provide elite-level feedback that a candidate would pay thousands for.
-- Prioritize Action Verbs (Developed, Orchestrated, Optimized, Scaled).
-- Focus on "Business Value" provided, not just "Tasks" performed.
-- Always remain contextual to the provided resume data.
-
-JOB MATCHING MODE: Return JSON { "matchPercentage": number, "matched": [], "missing": [], "totalJobKeywords": number, "analysis": "string", "recommendations": [] }`;
-
-  const userPrompt = `Resume: ${resumeData.rawText || JSON.stringify(resumeData.extractedData)}\nJD: ${jobDescription}`;
-
+const getResumeAdvice = async (userMessage, resumeData, analysisResults) => {
   try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 1000
-    });
-
-    const content = response.choices[0].message.content;
-    const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanContent);
+    return await generateResumeAdvice(userMessage, resumeData, analysisResults);
   } catch (error) {
-    console.error('JD matching failed:', error);
-    throw error;
+    console.error("AI Advice generation failed. Details:");
+    console.error("- Message:", error.message);
+    console.error("- Stack:", error.stack);
+
+    // Simple rule-based fallback
+    const msg = (userMessage || "").toLowerCase();
+    if (msg.includes('skill') || msg.includes('learn')) {
+      return "Based on your resume, I recommend focusing on the technical gaps identified in your analysis, particularly the ones listed in your 'Critical Gaps' section. Strengthening these will significantly improve your market score.";
+    } else if (msg.includes('experience') || msg.includes('work')) {
+      return "To enhance your experience section, try to quantify your achievements more. For example, instead of saying 'Developed features', say 'Improved system performance by 20% by optimizing...'";
+    } else {
+      return `I'm having a bit of trouble connecting to my advanced AI core right now (Error: ${error.message}), but I've reviewed your resume! My high-level advice is to focus on the 'Actionable Roadmap' items on your dashboard. They contain the most critical steps for your career progression.`;
+    }
   }
 };
 
 const parseStructuredDataWithAI = async (rawText) => {
-  if (!OPENAI_API_KEY) throw new Error('OpenAI API key is missing');
-
-  const systemPrompt = `You are a professional resume parser. Extract information from the resume and return ONLY a valid JSON object.
-
-CRITICAL INSTRUCTIONS - FOLLOW EXACTLY:
-1. Return ONLY valid JSON - no markdown, no explanations, no extra text
-2. Use the EXACT structure shown below
-3. Each field must contain the correct type of data as specified
-
-REQUIRED JSON STRUCTURE:
-{
-  "name": "string - Full name from resume",
-  "email": "string - Email address",
-  "phone": "string - Phone number",
-  "address": "string - City, State/Country ONLY (e.g. 'San Francisco, CA')",
-  "summary": "string - Professional summary or objective",
-  "experience": [
-    {
-      "company": "string - Company name ONLY",
-      "position": "string - Job title ONLY",
-      "duration": "string - Date range (e.g. 'Jan 2020 - Dec 2022')",
-      "responsibilities": ["array of strings - Each responsibility as separate item"]
-    }
-  ],
-  "education": [
-    {
-      "institution": "string - School/University name ONLY",
-      "degree": "string - Degree name ONLY (e.g. 'Bachelor of Science in Computer Science')",
-      "dates": "string - Graduation year or date range"
-    }
-  ],
-  "skills": {
-    "technical": ["array of strings - Technical skills like JavaScript, Python, etc."],
-    "soft": ["array of strings - Soft skills like Leadership, Communication, etc."]
-  },
-  "projects": [
-    {
-      "name": "string - Project name",
-      "description": "string - Brief description",
-      "technologies": ["array of strings - Technologies used"],
-      "startDate": "string - Start date",
-      "endDate": "string - End date",
-      "github": "string - GitHub URL if available",
-      "liveUrl": "string - Live URL if available",
-      "achievements": ["array of strings - Key achievements"]
-    }
-  ],
-  "certifications": [
-    {
-      "name": "string - Certification name ONLY",
-      "issuer": "string - Issuing organization ONLY",
-      "date": "string - Date obtained"
-    }
-  ],
-  "languages": [
-    {
-      "language": "string - Language name",
-      "proficiency": "string - Proficiency level",
-      "spoken": true,
-      "written": true
-    }
-  ],
-  "interests": ["array of strings - Personal interests"]
-}
-
-FIELD VALIDATION RULES:
-- "company" field: ONLY company/organization name, NO job descriptions or responsibilities
-- "position" field: ONLY job title, NO company name
-- "institution" field: ONLY school/university name, NO degree information
-- "degree" field: ONLY degree name, NO school name
-- "responsibilities": Must be an ARRAY of strings, each item is one responsibility
-- "name" (certification): ONLY certification name, NO issuing body
-- "issuer" (certification): ONLY issuing organization, NO certification name
-
-IMPORTANT: 
-- Do NOT mix up fields (e.g., don't put company name in position field)
-- Do NOT put multiple pieces of information in one field
-- If a field is not found, use null for strings, [] for arrays, {} for objects
-- Return ONLY the JSON object, nothing else`;
-
-  try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: `Extract structured data from this resume. Return ONLY valid JSON:\n\n${rawText}`
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 3000,
-      response_format: { type: "json_object" }
-    });
-
-    const content = response.choices[0].message.content;
-    console.log("Raw AI Response:", content.substring(0, 500));
-
-    // Multi-stage cleaning to handle varied LLM responses
-    const cleanContent = content
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-      .trim();
-
-    const parsed = JSON.parse(cleanContent);
-
-    // Validate and clean the parsed data
-    const validated = validateAIResponse(parsed);
-    console.log("Validated AI Response:", JSON.stringify(validated, null, 2).substring(0, 500));
-
-    return validated;
-  } catch (error) {
-    console.error('AI extraction failed:', error);
-    throw error;
-  }
+  return aiDataExtractor(rawText);
 };
 
 // Helper function to validate and clean AI response
 function validateAIResponse(data) {
-  const cleaned = {
-    name: typeof data.name === 'string' ? data.name : null,
-    email: typeof data.email === 'string' ? data.email : null,
-    phone: typeof data.phone === 'string' ? data.phone : null,
-    address: typeof data.address === 'string' ? data.address : null,
-    summary: typeof data.summary === 'string' ? data.summary : null,
-    experience: [],
-    education: [],
-    skills: {
-      technical: [],
-      soft: []
-    },
-    projects: [],
-    certifications: [],
-    languages: [],
-    interests: []
+  const sanitize = (val) => {
+    if (typeof val !== 'string') return null;
+    return val.trim()
+      .replace(/^[\s•\-\*]+/, '')
+      .replace(/^(Responsibilities|Teaching|Institute|Job Title|Duration|Degree):\s*/i, '');
   };
 
-  // Validate experience
-  if (Array.isArray(data.experience)) {
-    cleaned.experience = data.experience.map(exp => ({
-      company: typeof exp.company === 'string' ? exp.company.trim() : 'Company Not Specified',
-      position: typeof exp.position === 'string' ? exp.position.trim() : 'Position Not Specified',
-      duration: typeof exp.duration === 'string' ? exp.duration.trim() : 'Duration Not Specified',
-      responsibilities: Array.isArray(exp.responsibilities)
-        ? exp.responsibilities.filter(r => typeof r === 'string' && r.trim().length > 0)
-        : []
-    })).filter(exp => exp.company || exp.position);
-  }
-
-  // Validate education
-  if (Array.isArray(data.education)) {
-    cleaned.education = data.education.map(edu => ({
-      institution: typeof edu.institution === 'string' ? edu.institution.trim() : 'Institution Not Specified',
-      degree: typeof edu.degree === 'string' ? edu.degree.trim() : 'Degree Not Specified',
-      dates: typeof edu.dates === 'string' ? edu.dates.trim() : 'Dates Not Specified'
-    })).filter(edu => edu.institution || edu.degree);
-  }
-
-  // Validate skills
-  if (data.skills && typeof data.skills === 'object') {
-    if (Array.isArray(data.skills.technical)) {
-      cleaned.skills.technical = data.skills.technical
-        .filter(s => typeof s === 'string' && s.trim().length > 0)
-        .map(s => s.trim());
-    }
-    if (Array.isArray(data.skills.soft)) {
-      cleaned.skills.soft = data.skills.soft
-        .filter(s => typeof s === 'string' && s.trim().length > 0)
-        .map(s => s.trim());
-    }
-  }
-
-  // Validate projects
-  if (Array.isArray(data.projects)) {
-    cleaned.projects = data.projects.map(proj => ({
-      name: typeof proj.name === 'string' ? proj.name.trim() : 'Project Name Not Specified',
-      description: typeof proj.description === 'string' ? proj.description.trim() : '',
-      technologies: Array.isArray(proj.technologies)
-        ? proj.technologies.filter(t => typeof t === 'string' && t.trim().length > 0)
-        : [],
-      startDate: typeof proj.startDate === 'string' ? proj.startDate.trim() : '',
-      endDate: typeof proj.endDate === 'string' ? proj.endDate.trim() : '',
-      github: typeof proj.github === 'string' ? proj.github.trim() : '',
-      liveUrl: typeof proj.liveUrl === 'string' ? proj.liveUrl.trim() : '',
-      achievements: Array.isArray(proj.achievements)
-        ? proj.achievements.filter(a => typeof a === 'string' && a.trim().length > 0)
-        : []
-    })).filter(proj => proj.name);
-  }
-
-  // Validate certifications
-  if (Array.isArray(data.certifications)) {
-    cleaned.certifications = data.certifications.map(cert => ({
-      name: typeof cert.name === 'string' ? cert.name.trim() : 'Certification Not Specified',
-      issuer: typeof cert.issuer === 'string' ? cert.issuer.trim() : 'Issuer Not Specified',
-      date: typeof cert.date === 'string' ? cert.date.trim() : 'Date Not Specified'
-    })).filter(cert => cert.name);
-  }
-
-  // Validate languages
-  if (Array.isArray(data.languages)) {
-    cleaned.languages = data.languages.map(lang => ({
-      language: typeof lang.language === 'string' ? lang.language.trim() : 'Language Not Specified',
-      proficiency: typeof lang.proficiency === 'string' ? lang.proficiency.trim() : 'Not Specified',
-      spoken: typeof lang.spoken === 'boolean' ? lang.spoken : false,
-      written: typeof lang.written === 'boolean' ? lang.written : false
-    })).filter(lang => lang.language);
-  }
-
-  // Validate interests
-  if (Array.isArray(data.interests)) {
-    cleaned.interests = data.interests
-      .filter(i => typeof i === 'string' && i.trim().length > 0)
-      .map(i => i.trim());
-  }
+  const cleaned = {
+    name: sanitize(data.name),
+    email: sanitize(data.email),
+    phone: sanitize(data.phone),
+    address: sanitize(data.address),
+    summary: typeof data.summary === 'string' ? data.summary.trim() : null,
+    experience: Array.isArray(data.experience) ? data.experience.map(exp => ({
+      company: sanitize(exp.company) || 'Company Not Specified',
+      position: sanitize(exp.position) || 'Position Not Specified',
+      duration: sanitize(exp.duration) || 'Duration Not Specified',
+      responsibilities: Array.isArray(exp.responsibilities) ? exp.responsibilities.map(r => sanitize(r)).filter(r => r) : []
+    })) : [],
+    education: Array.isArray(data.education) ? data.education.map(edu => ({
+      institution: sanitize(edu.institution) || 'Institution Not Specified',
+      degree: sanitize(edu.degree) || 'Degree Not Specified',
+      dates: sanitize(edu.dates) || 'Dates Not Specified',
+      gpa: sanitize(edu.gpa) || null
+    })) : [],
+    skills: {
+      technical: data.skills?.technical || [],
+      soft: data.skills?.soft || []
+    },
+    projects: Array.isArray(data.projects) ? data.projects.map(p => ({
+      name: sanitize(p.name) || 'Project',
+      description: sanitize(p.description) || '',
+      technologies: p.technologies || []
+    })) : [],
+    certifications: Array.isArray(data.certifications) ? data.certifications.map(c => ({
+      name: sanitize(c.name) || 'Cert',
+      issuer: sanitize(c.issuer) || '',
+      date: sanitize(c.date) || ''
+    })) : [],
+    languages: Array.isArray(data.languages) ? data.languages.map(l => ({
+      language: sanitize(l.language) || '',
+      proficiency: sanitize(l.proficiency) || ''
+    })) : [],
+    interests: Array.isArray(data.interests) ? data.interests.map(i => sanitize(i)).filter(i => i) : []
+  };
 
   return cleaned;
 }
@@ -1479,7 +1384,5 @@ module.exports = {
   parseResume,
   analyzeResume,
   matchKeywords,
-  analyzeResumeWithAI,
-  matchJobDescriptionWithAI,
-  parseStructuredDataWithAI
+  getResumeAdvice
 };

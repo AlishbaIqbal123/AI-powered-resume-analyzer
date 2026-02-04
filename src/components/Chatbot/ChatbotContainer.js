@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
-import { generateResumeAdvice } from '../../services/aiService';
+import { generateResumeAdvice } from '../../services/resumeParser';
 import './ChatbotContainer.css';
 
 const ChatbotContainer = ({ resumeData, analysisResults }) => {
@@ -39,8 +39,8 @@ const ChatbotContainer = ({ resumeData, analysisResults }) => {
     setIsLoading(true);
 
     try {
-      // Generate AI response based on resume data and user message
-      const aiResponse = await generateAIResponse(userMessage, resumeData, analysisResults);
+      // 1. Attempt Backend AI connection
+      const aiResponse = await generateResumeAdvice(userMessage, resumeData, analysisResults);
 
       const aiMsg = {
         id: Date.now() + 1,
@@ -51,58 +51,21 @@ const ChatbotContainer = ({ resumeData, analysisResults }) => {
 
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
-      console.error('Error getting AI response:', error);
-      const errorMsg = {
-        id: Date.now() + 1,
-        text: "Sorry, I encountered an error. Please try again.",
+      console.warn('Backend AI Offline, switching to local intelligence engine...');
+
+      // 2. High-Fidelity Local Simulation Fallback
+      const fallbackResponse = simulateAIResponse(userMessage, resumeData, analysisResults);
+
+      const aiMsg = {
+        id: Date.now() + 2,
+        text: fallbackResponse,
         sender: 'ai',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMsg]);
+
+      setMessages(prev => [...prev, aiMsg]);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const generateAIResponse = async (userMessage, resumeData, analysisResults) => {
-    try {
-      // Try to use the backend AI service first
-      try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/ai/advice`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage,
-            resumeData,
-            analysisResults
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          return data.data;
-        } else {
-          console.warn('Backend AI service failed, falling back to direct API call:', response.statusText);
-        }
-      } catch (backendError) {
-        console.warn('Backend AI service error, falling back to direct API call:', backendError);
-      }
-      
-      // The generateResumeAdvice service now handles its own retries and basic 429 errors
-      if (process.env.REACT_APP_OPENAI_API_KEY) {
-        return await generateResumeAdvice(userMessage, resumeData, analysisResults);
-      } else {
-        return simulateAIResponse(userMessage, resumeData, analysisResults);
-      }
-    } catch (error) {
-      console.error('Error generating AI response:', error);
-      // Give the user a helpful hint about the 429 error if it still persists
-      if (error.message?.includes('429')) {
-        return "The AI service is currently very busy (Rate Limit). I've tried retrying, but I still can't connect. Please wait a minute and try again!";
-      }
-      return `I'm having a technical hiccup connecting to the wisdom cloud. ${error.message || 'Please try again in a moment.'}`;
     }
   };
 

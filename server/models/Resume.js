@@ -4,7 +4,7 @@ const resumeSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
   fileName: {
     type: String,
@@ -98,7 +98,7 @@ const resumeSchema = new mongoose.Schema({
 });
 
 // Update the updatedAt field before saving
-resumeSchema.pre('save', function(next) {
+resumeSchema.pre('save', function (next) {
   this.updatedAt = Date.now;
   next();
 });

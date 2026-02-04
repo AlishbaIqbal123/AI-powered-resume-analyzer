@@ -1,199 +1,109 @@
 import React, { useState } from 'react';
-import { matchJobDescriptionWithAI } from '../services/aiService';
+import { FaBullseye, FaCheckCircle, FaExclamationCircle, FaTerminal, FaMagic, FaHistory } from 'react-icons/fa';
+import { matchKeywords } from '../services/resumeParser';
 import './KeywordMatcher.css';
 
 const KeywordMatcher = ({ resumeData }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [matchResults, setMatchResults] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
   const [error, setError] = useState(null);
 
   const analyzeKeywords = async () => {
-    if (!jobDescription.trim()) {
-      alert('Please enter a job description to analyze');
-      return;
-    }
+    if (!jobDescription.trim()) return;
 
     setIsAnalyzing(true);
     setError(null);
-    setMatchResults(null);
 
     try {
-      // Try to use the backend AI matching service first
-      try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/ai/match-jd`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            resumeData,
-            jobDescription
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setMatchResults(data.data);
-          return;
-        } else {
-          console.warn('Backend AI service failed, falling back to direct API call:', response.statusText);
-        }
-      } catch (backendError) {
-        console.warn('Backend AI service error, falling back to direct API call:', backendError);
-      }
-      
-      // Fallback to direct API call
-      const results = await matchJobDescriptionWithAI(resumeData, jobDescription);
-      setMatchResults(results);
+      // Use centralized matchKeywords service
+      const result = await matchKeywords(resumeData, jobDescription);
+      setMatchResults(result);
     } catch (err) {
-      console.error('Error analyzing keywords:', err);
-      let errorMsg = "Failed to analyze with AI. Check your API Key in the settings or try again in a few moments.";
-
-      if (err.message.includes('429')) {
-        errorMsg = "The AI service is currently at its limit (Rate Limit). We tried retrying, but please wait a minute before trying again.";
-      }
-
-      setError(errorMsg);
+      console.error('Analysis error:', err);
+      setError(err.message || "Synchronous Analysis encountered a latency issue. Gemini 2.0 Flash might be throttled.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleSampleJobDescription = () => {
-    const sampleDesc = `We are looking for a Senior Software Engineer with expertise in:
-      - 5+ years of experience with JavaScript and modern frameworks (React, Angular)
-      - Strong Node.js backend development skills
-      - Experience with cloud platforms (AWS, Azure, or GCP)
-      - Knowledge of databases (SQL and NoSQL)
-      - Familiarity with CI/CD pipelines and DevOps practices
-      - Agile development methodologies
-      - Experience with Git version control
-      - Strong problem-solving and communication skills`;
-
-    setJobDescription(sampleDesc);
+  const loadSample = () => {
+    setJobDescription(`Senior Full Stack Developer
+Requirements:
+- Strong proficiency in React, Node.js and TypeScript
+- Experience with Cloud Infrastructure (AWS/GCP)
+- Proven record of optimizing web performance
+- Knowledge of Vector Databases and LLM integration
+- Minimum 5+ years of professional engineering experience`);
   };
 
   return (
-    <div className="keyword-matcher-container">
-      <h2>Keyword Matching Tool</h2>
-      <p className="subtitle">Compare your resume against job descriptions to identify matching keywords and improvement opportunities</p>
+    <div className="keyword-matcher-container animate-in">
+      <div className="matcher-header">
+        <h1 className="text-gradient">Semantic Matcher</h1>
+        <p className="subtext">Deep architectural alignment between your profile and target roles.</p>
+      </div>
 
-      <div className="input-section">
-        <div className="job-description-input">
-          <label htmlFor="job-desc">Job Description:</label>
+      <div className="jd-input-area">
+        <div className="modern-card" style={{ padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <span className="stat-label"><FaTerminal /> Intelligence Input</span>
+            <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={loadSample}>
+              Load Sample Case
+            </button>
+          </div>
           <textarea
-            id="job-desc"
+            className="jd-textarea"
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Paste the job description here..."
-            rows={6}
+            placeholder="Paste technical job description here for deep alignment analysis..."
           />
-          <button className="sample-btn" onClick={handleSampleJobDescription}>
-            Load Sample Job Description
+          <button
+            className="btn-primary"
+            style={{ width: '100%', marginTop: '1.5rem', justifyContent: 'center' }}
+            onClick={analyzeKeywords}
+            disabled={isAnalyzing || !jobDescription.trim()}
+          >
+            {isAnalyzing ? <><FaMagic className="animate-spin" /> Cross-Referencing DNA...</> : <><FaBullseye /> Execute Semantic Match</>}
           </button>
         </div>
-
-        <button
-          className="analyze-btn"
-          onClick={analyzeKeywords}
-          disabled={isAnalyzing || !jobDescription.trim()}
-        >
-          {isAnalyzing ? 'Analyzing...' : 'Analyze Keywords'}
-        </button>
       </div>
 
       {matchResults && (
-        <div className="results-section">
-          <div className="match-summary">
-            <div className="match-score">
-              <h3>Match Score: {matchResults.matchPercentage}%</h3>
-              <p>{matchResults.matched.length} keywords matched out of {matchResults.totalJobKeywords} job requirements</p>
+        <div className="results-panel animate-in">
+          <div className="modern-card match-hero-card">
+            <span className="stat-label">Compatibility Index</span>
+            <div className="score-circle-group">
+              <div className="percent-display">{matchResults.matchPercentage}<span>%</span></div>
             </div>
-
-            <div className="progress-bar-container">
-              <div
-                className="progress-bar"
-                style={{ width: `${matchResults.matchPercentage}%` }}
-              ></div>
-            </div>
+            <p className="analysis-text" style={{ maxWidth: '600px', margin: '0 auto' }}>
+              {matchResults.analysis}
+            </p>
           </div>
 
-          <div className="keywords-section">
-            <div className="matched-keywords">
-              <h3>✅ Matched Keywords ({matchResults.matched.length})</h3>
-              <div className="keyword-grid">
-                {matchResults.matched.map((keyword, index) => (
-                  <div key={index} className="keyword-card matched">
-                    <span className="keyword-text">{keyword}</span>
-                    <span className="keyword-status">Present</span>
-                  </div>
+          <div className="comparison-grid">
+            <div className="modern-card keyword-bank" style={{ padding: '1.5rem' }}>
+              <h4><FaCheckCircle color="var(--primary)" /> DNA Alignment</h4>
+              <div className="tag-cloud">
+                {(matchResults.matched || []).map((tag, i) => (
+                  <span key={i} className="keyword-pill match">{tag}</span>
                 ))}
-                {matchResults.matched.length === 0 && (
-                  <p className="no-match">No matching keywords found in your resume</p>
-                )}
               </div>
             </div>
-
-            <div className="missing-keywords">
-              <h3>❌ Missing Keywords ({matchResults.missing.length})</h3>
-              <div className="keyword-grid">
-                {matchResults.missing.map((keyword, index) => (
-                  <div key={index} className="keyword-card missing">
-                    <span className="keyword-text">{keyword}</span>
-                    <span className="keyword-status">Missing</span>
-                  </div>
+            <div className="modern-card keyword-bank" style={{ padding: '1.5rem' }}>
+              <h4><FaExclamationCircle color="#fb7185" /> Critical Gaps</h4>
+              <div className="tag-cloud">
+                {(matchResults.missing || []).map((tag, i) => (
+                  <span key={i} className="keyword-pill gap">{tag}</span>
                 ))}
-                {matchResults.missing.length === 0 && (
-                  <p className="no-missing">Great job! Your resume contains all the key terms from the job description.</p>
-                )}
               </div>
             </div>
           </div>
 
-          <div className="recommendations">
-            <h3>Recommendations</h3>
-            <ul>
-              {matchResults.missing.slice(0, 3).map((keyword, index) => (
-                <li key={index}>Consider adding "{keyword}" to your resume, especially in your skills section or experience descriptions</li>
-              ))}
-              {matchResults.matchPercentage < 50 && (
-                <li>Focus on incorporating more technical keywords that match the job requirements</li>
-              )}
-              {matchResults.matchPercentage >= 50 && matchResults.matchPercentage < 75 && (
-                <li>Your resume has good keyword coverage, but could benefit from including a few more relevant terms</li>
-              )}
-              {matchResults.matchPercentage >= 75 && (
-                <li>Excellent keyword alignment! Your resume is well-optimized for this position.</li>
-              )}
-            </ul>
-          </div>
         </div>
       )}
 
-      {error && (
-        <div className="error-panel">
-          <div className="error-icon">⚠️</div>
-          <div className="error-message">
-            <h3>Matching Encountered an Issue</h3>
-            <p>{error}</p>
-          </div>
-          <button className="retry-btn" onClick={analyzeKeywords}>Retry matching</button>
-        </div>
-      )}
-
-      {!matchResults && !error && (
-        <div className="info-panel">
-          <h3>How Keyword Matching Works</h3>
-          <ul>
-            <li>Paste a job description to see which keywords from the posting match your resume</li>
-            <li>Identify missing keywords that could improve your application's ATS score</li>
-            <li>Understand which skills and qualifications are most important for the role</li>
-            <li>Get personalized recommendations to optimize your resume for specific positions</li>
-          </ul>
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
     </div>
   );
 };

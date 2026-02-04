@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { FaChartPie, FaListAlt, FaLightbulb, FaHistory, FaCheckCircle, FaExclamationTriangle, FaDownload, FaSearch, FaRocket, FaBullseye, FaArrowRight, FaClock, FaDraftingCompass } from 'react-icons/fa';
+import {
+  FaChartLine, FaBrain, FaRocket, FaShieldAlt,
+  FaCheckCircle, FaExclamationCircle, FaBolt,
+  FaDownload, FaLayerGroup, FaMagic, FaTimes
+} from 'react-icons/fa';
 import ChatbotContainer from './Chatbot/ChatbotContainer';
 import ExportModal from './ExportModal';
 import './Dashboard.css';
@@ -7,240 +11,309 @@ import './Dashboard.css';
 const Dashboard = ({ resumeData, analysisResults }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedImprovement, setSelectedImprovement] = useState(null);
 
-  const getProgressStatus = () => {
-    if (!analysisResults) return 'Upload and analyze your resume to see progress';
+  if (!analysisResults) {
+    return (
+      <div className="modern-card animate-in" style={{ padding: '4rem', textAlign: 'center' }}>
+        <FaBrain style={{ fontSize: '4rem', color: 'var(--zinc-800)', marginBottom: '1.5rem' }} />
+        <h2 className="text-gradient">Ready for Deep Analysis</h2>
+        <p className="subtext">Upload your professional profile to generate high-fidelity career insights.</p>
+      </div>
+    );
+  }
 
-    const score = analysisResults.overallScore;
-    if (score >= 85) return 'Excellent - Your resume is highly competitive!';
-    if (score >= 70) return 'Good - Your resume is competitive with minor improvements needed';
-    if (score >= 55) return 'Average - Consider making several improvements to strengthen your resume';
-    return 'Needs Work - Significant improvements needed to make your resume competitive';
-  };
+  const renderOverview = () => (
+    <div className="animate-in">
+      <div className="stats-grid">
+        <div className="modern-card stat-card featured">
+          <span className="stat-label">Execution Score</span>
+          <div className="hero-score">
+            {analysisResults?.overallScore || 0}<span>/100</span>
+          </div>
+          <div className="subtext">
+            {(analysisResults?.overallScore || 0) > 80 ? 'Exceptional Performance' : 'Growth Potential Identified'}
+          </div>
+        </div>
 
-  const getImprovementPriority = () => {
-    if (!analysisResults) return [];
+        <div className="modern-card stat-card">
+          <span className="stat-label">Role Precision</span>
+          <div className="hero-score" style={{ color: 'var(--text-main)', fontSize: '2.5rem' }}>
+            {(() => {
+              const rawFit = analysisResults?.personalization?.targetRoleFit || analysisResults?.targetRoleFit || 'High';
+              const fit = String(rawFit);
 
-    const areas = [
-      { name: 'Content Quality', score: analysisResults.contentScore, icon: <FaListAlt /> },
-      { name: 'Formatting Accuracy', score: analysisResults.formattingScore, icon: <FaDraftingCompass /> },
-      { name: 'Job Relevance', score: analysisResults.relevanceScore, icon: <FaBullseye /> }
-    ];
+              // If it's short enough, display it
+              if (fit.length <= 15) return fit;
 
-    return areas.sort((a, b) => a.score - b.score);
-  };
+              // If it's long, try to extract the rating keyword
+              const lowerFit = fit.toLowerCase();
+              if (lowerFit.includes('high') || lowerFit.includes('strong') || lowerFit.includes('excellent') || lowerFit.includes('perfect')) return 'High';
+              if (lowerFit.includes('medium') || lowerFit.includes('average') || lowerFit.includes('moderate') || lowerFit.includes('good')) return 'Medium';
+              if (lowerFit.includes('low') || lowerFit.includes('poor') || lowerFit.includes('weak') || lowerFit.includes('gap')) return 'Low';
 
-  const exportResults = () => {
-    setShowExportModal(true);
-  };
+              // Fallback if no keyword found
+              return 'Moderate';
+            })()}
+          </div>
+          <p className="subtext">Alignment with Market Standards</p>
+        </div>
 
-  return (
-    <div className="dashboard-container">
-      <h2>Professional Career Dashboard</h2>
-
-      <div className="dashboard-tabs">
-        <button
-          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          <FaChartPie /> Overview
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={() => setActiveTab('details')}
-        >
-          <FaListAlt /> Detailed Analysis
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'improvements' ? 'active' : ''}`}
-          onClick={() => setActiveTab('improvements')}
-        >
-          <FaLightbulb /> Improvement Plan
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'tracking' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tracking')}
-        >
-          <FaHistory /> Tracking
-        </button>
+        <div className="modern-card stat-card">
+          <span className="stat-label">Identity Verified</span>
+          <div className="contact-info-list" style={{ marginTop: '0.5rem' }}>
+            <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-main)' }}><strong>{resumeData.extractedData.name}</strong></p>
+            <p className="subtext" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{resumeData.extractedData.email}</p>
+          </div>
+          <button
+            className="btn-primary"
+            style={{ marginTop: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+            onClick={() => setShowExportModal(true)}
+          >
+            <FaDownload /> Export Intelligence
+          </button>
+        </div>
       </div>
 
-      <div className="dashboard-content">
-        {activeTab === 'overview' && (
-          <div className="overview-tab">
-            {analysisResults ? (
-              <>
-                <div className="summary-cards">
-                  <div className="summary-card primary">
-                    <div className="summary-icon"><FaRocket /></div>
-                    <h3>Execution Score</h3>
-                    <div className="score-display">{analysisResults.overallScore}/100</div>
-                    <p>{getProgressStatus()}</p>
-                  </div>
-
-                  <div className="summary-card contact-brief">
-                    <h3>Professional Identity</h3>
-                    <div className="contact-info-list">
-                      <div className="contact-item"><strong>Name:</strong> {resumeData.extractedData.name || 'Not Detected'}</div>
-                      <div className="contact-item"><strong>Email:</strong> {resumeData.extractedData.email || 'Not Detected'}</div>
-                      <div className="contact-item"><strong>Phone:</strong> {resumeData.extractedData.phone || 'Not Detected'}</div>
-                      <div className="contact-item"><strong>Loc:</strong> {resumeData.extractedData.address || 'Not Detected'}</div>
-                    </div>
-                  </div>
-
-                  <div className="summary-card mobility-fit">
-                    <h3>Target Alignment</h3>
-                    <div className="role-fit">
-                      <span className="fit-value">{analysisResults.personalization.targetRoleFit}</span>
-                    </div>
-                    <p>Alignment with {analysisResults.industrySpecific?.targetRole || 'Software Engineering'} standards</p>
-                  </div>
+      <div className="main-dashboard-grid">
+        <div className="modern-card" style={{ padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FaChartLine color="var(--primary)" /> Technical Authority Breakdown
+          </h3>
+          <div className="metrics-list">
+            {[
+              { label: 'ATS Parsing Readiness', val: analysisResults.scores?.ats || 0, max: 30 },
+              { label: 'Industry Keyword Density', val: analysisResults.scores?.keyword || 0, max: 30 },
+              { label: 'Impact Factor', val: analysisResults.scores?.content || 0, max: 20 },
+              { label: 'Contextual Relevance', val: analysisResults.scores?.relevance || 0, max: 20 }
+            ].map((m, i) => (
+              <div key={i} className="metric-row">
+                <div className="metric-header">
+                  <span className="metric-name">{m.label}</span>
+                  <span className="metric-val">{m.val || 0}/{m.max}</span>
                 </div>
-
-                <div className="breakdown-section">
-                  <h3>Precision Metrics (ATS Standards)</h3>
-                  <div className="score-breakdown">
-                    <div className="breakdown-item">
-                      <span>ATS Compatibility (30%)</span>
-                      <div className="breakdown-bar">
-                        <div className="ats-fill" style={{ width: `${(analysisResults.scores?.ats / 30) * 100}%` }}></div>
-                        <span className="breakdown-percent">{analysisResults.scores?.ats}/30</span>
-                      </div>
-                    </div>
-                    <div className="breakdown-item">
-                      <span>Keyword Alignment (30%)</span>
-                      <div className="breakdown-bar">
-                        <div className="keyword-fill" style={{ width: `${(analysisResults.scores?.keyword / 30) * 100}%` }}></div>
-                        <span className="breakdown-percent">{analysisResults.scores?.keyword}/30</span>
-                      </div>
-                    </div>
-                    <div className="breakdown-item">
-                      <span>Content Authority (20%)</span>
-                      <div className="breakdown-bar">
-                        <div className="content-fill" style={{ width: `${(analysisResults.scores?.content / 20) * 100}%` }}></div>
-                        <span className="breakdown-percent">{analysisResults.scores?.content}/20</span>
-                      </div>
-                    </div>
-                    <div className="breakdown-item">
-                      <span>Role Relevance (20%)</span>
-                      <div className="breakdown-bar">
-                        <div className="relevance-fill" style={{ width: `${(analysisResults.scores?.relevance / 20) * 100}%` }}></div>
-                        <span className="breakdown-percent">{analysisResults.scores?.relevance}/20</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="progress-track">
+                  <div className="progress-thumb" style={{ width: `${Math.min(((m.val || 0) / m.max) * 100, 100)}%` }}></div>
                 </div>
-
-                <div className="quick-actions">
-                  <div className="action-buttons">
-                    <button className="action-btn primary" onClick={exportResults}>
-                      <FaDownload /> Download Report
-                    </button>
-                    <button className="action-btn secondary" onClick={() => alert('Navigate to JD Matching via sidebar')}>
-                      <FaSearch /> Compare with JD
-                    </button>
-                  </div>
-                </div>
-
-                <div className="chatbot-section">
-                  <h3>AI Career Coach</h3>
-                  <ChatbotContainer resumeData={resumeData} analysisResults={analysisResults} />
-                </div>
-              </>
-            ) : (
-              <div className="no-analysis-placeholder">
-                <FaExclamationTriangle className="placeholder-icon" />
-                <h3>No Data Points Detected</h3>
-                <p>Complete your first analysis to populate your career dashboard.</p>
               </div>
-            )}
+            ))}
           </div>
-        )}
+        </div>
 
-        {activeTab === 'details' && (
-          <div className="details-tab">
-            {analysisResults ? (
-              <div className="details-grid">
-                <div className="details-section">
-                  <h3><FaCheckCircle className="icon-success" /> Competitive Advantages</h3>
-                  <ul className="details-list">
-                    {analysisResults.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-                <div className="details-section">
-                  <h3><FaExclamationTriangle className="icon-warning" /> Critical Knowledge Gaps</h3>
-                  <ul className="details-list">
-                    {analysisResults.weaknesses.map((w, i) => <li key={i}>{w}</li>)}
-                  </ul>
-                </div>
+        <div className="modern-card" style={{ padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FaLayerGroup color="var(--primary)" /> Strategic Insights
+          </h3>
+          <div className="insights-group">
+            <div className="insight-item">
+              <FaShieldAlt className="insight-icon" />
+              <div className="insight-content">
+                <h4>Core Strength</h4>
+                <p>{analysisResults?.strengths?.[0] || 'Strategic Professional Profile'}</p>
               </div>
-            ) : null}
-          </div>
-        )}
-
-        {activeTab === 'improvements' && (
-          <div className="improvements-tab">
-            {analysisResults ? (
-              <div className="action-plan">
-                <h3><FaRocket className="icon-rocket" /> Recommended Action Plan</h3>
-                <div className="suggestion-cards-grid">
-                  {analysisResults.suggestions.map((suggestion, index) => (
-                    <div key={index} className="suggestion-card-premium">
-                      <div className="suggestion-number">{index + 1}</div>
-                      <div className="suggestion-body">
-                        <h4>Strategic Update</h4>
-                        <p>{suggestion}</p>
-                        <div className="priority-tag">High Priority</div>
-                      </div>
-                    </div>
-                  ))}
-                  {analysisResults.suggestions.length === 0 && (
-                    <div className="no-suggestions">
-                      <FaCheckCircle /> Your resume is already in excellent shape! No major updates required.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {activeTab === 'tracking' && (
-          <div className="tracking-tab">
-            <h3>Milestone Progress</h3>
-            <div className="milestone-list">
-              <div className="milestone-item completed">
-                <div className="milestone-icon"><FaCheckCircle /></div>
-                <div className="milestone-text">
-                  <h5>Resume Analyzed</h5>
-                  <p>System successfully processed document structure.</p>
-                </div>
-              </div>
-              <div className="milestone-item completed">
-                <div className="milestone-icon"><FaCheckCircle /></div>
-                <div className="milestone-text">
-                  <h5>AI Insights Generated</h5>
-                  <p>Extracted semantic meaning and industry score.</p>
-                </div>
-              </div>
-              <div className="milestone-item">
-                <div className="milestone-icon"><FaClock /></div>
-                <div className="milestone-text">
-                  <h5>Feedback Implementation</h5>
-                  <p>Pending user updates to document content.</p>
-                </div>
+            </div>
+            <div className="insight-item">
+              <FaBolt className="insight-icon" />
+              <div className="insight-content">
+                <h4>Primary Objective</h4>
+                <p>{(analysisResults?.improvements?.[0]?.action || analysisResults?.suggestions?.[0]) || 'Enhance your resume with quantifiable achievements'}</p>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
-      <ExportModal 
+
+      <div className="modern-card coach-preview">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <div>
+            <h3 className="text-gradient" style={{ fontSize: '1.5rem' }}>AI Career Strategy Coach</h3>
+            <p className="subtext">Hyper-personalized advice based on your extracted professional DNA.</p>
+          </div>
+          <FaMagic style={{ fontSize: '2rem', color: 'var(--primary)', opacity: 0.5 }} />
+        </div>
+        <ChatbotContainer resumeData={resumeData} analysisResults={analysisResults} />
+      </div>
+    </div>
+  );
+
+
+  const renderResumeData = () => (
+    <div className="animate-in">
+      <div className="modern-card" style={{ padding: '2rem' }}>
+        <h2 className="text-gradient" style={{ marginBottom: '2rem' }}>Professional DNA</h2>
+
+        {/* Skills */}
+        <div className="resume-section">
+          <h3>Technical Arsenal</h3>
+          <div className="skill-tags">
+            {resumeData.extractedData.skills?.technical?.map((skill, i) => (
+              <span key={i} className="skill-tag">{skill}</span>
+            )) || <p className="subtext">No technical skills detected</p>}
+          </div>
+        </div>
+
+        {/* Experience */}
+        <div className="resume-section" style={{ marginTop: '2rem' }}>
+          <h3>Career Trajectory</h3>
+          <div className="timeline">
+            {resumeData.extractedData.experience?.map((exp, i) => (
+              <div key={i} className="timeline-item">
+                <div className="timeline-marker"></div>
+                <div className="timeline-content">
+                  <h4>{exp.position} <span className="at-separator">@</span> {exp.company}</h4>
+                  <p className="timeline-date">{exp.duration}</p>
+                  <ul className="timeline-responsibilities">
+                    {exp.responsibilities?.map((res, j) => <li key={j}>{res}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )) || <p className="subtext">No experience detected</p>}
+          </div>
+        </div>
+
+        {/* Education */}
+        <div className="resume-section" style={{ marginTop: '2rem' }}>
+          <h3>Academic Foundation</h3>
+          <div className="education-grid">
+            {resumeData.extractedData.education?.map((edu, i) => (
+              <div key={i} className="edu-card">
+                <h4>{edu.institution}</h4>
+                <p className="edu-degree">{edu.degree}</p>
+                <p className="edu-date">{edu.dates}</p>
+              </div>
+            )) || <p className="subtext">No education detected</p>}
+          </div>
+        </div>
+
+        {/* Projects */}
+        <div className="resume-section" style={{ marginTop: '2rem' }}>
+          <h3>Key Projects</h3>
+          <div className="education-grid">
+            {resumeData.extractedData.projects?.map((proj, i) => (
+              <div key={i} className="edu-card">
+                <h4>{proj.name}</h4>
+                <p className="edu-date" style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>{proj.description}</p>
+              </div>
+            )) || <p className="subtext">No projects detected</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderImprovements = () => (
+    <div className="animate-in">
+      <div className="modern-card" style={{ padding: '3rem' }}>
+        <h2 className="text-gradient" style={{ marginBottom: '2rem' }}>Actionable Roadmap</h2>
+        <div className="insights-group" style={{ gap: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+          {(analysisResults.improvements || analysisResults.suggestions || []).map((item, i) => (
+            <div
+              key={i}
+              className="insight-item clickable-card"
+              style={{ padding: '2rem', cursor: 'pointer', transition: 'transform 0.2s', border: '1px solid var(--card-border)' }}
+              onClick={() => typeof item === 'object' ? setSelectedImprovement(item) : null}
+            >
+              <div className="hero-score" style={{ fontSize: '2rem', minWidth: '3rem', color: 'var(--primary)' }}>0{i + 1}</div>
+              <div className="insight-content">
+                <h4 style={{ fontSize: '1.25rem', color: 'var(--text-main)' }}>
+                  {typeof item === 'object' ? item.action : 'Strategic Update'}
+                </h4>
+                {typeof item === 'object' && item.priority && (
+                  <span className={`priority-badge ${item.priority.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '1rem', background: 'var(--card-border)', color: 'var(--text-main)', marginLeft: '0.5rem' }}>
+                    {item.priority}
+                  </span>
+                )}
+                <p style={{ fontSize: '1.05rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                  {typeof item === 'object' ? 'Click for implementation details...' : item}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="dashboard-container">
+      <div className="dashboard-header-row">
+        <div className="dashboard-title-group">
+          <h1 className="text-gradient">Intelligence Overview</h1>
+          <p className="subtext">Synchronized Career Analysis • Gemini 2.0 Flash</p>
+        </div>
+
+        <div className="dashboard-tabs">
+          <button
+            className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <FaRocket /> Strategic Overview
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'resume' ? 'active' : ''}`}
+            onClick={() => setActiveTab('resume')}
+          >
+            <FaLayerGroup /> Parsed Data
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'improvements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('improvements')}
+          >
+            <FaMagic /> Optimization Roadmap
+          </button>
+        </div>
+      </div>
+
+      <div className="dashboard-body">
+        {activeTab === 'overview' && analysisResults && renderOverview()}
+        {activeTab === 'resume' && resumeData && renderResumeData()}
+        {activeTab === 'improvements' && analysisResults && renderImprovements()}
+      </div>
+
+      <ExportModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         resumeData={resumeData}
         analysisResults={analysisResults}
       />
-    </div>
+
+      {/* Improvement Modal */}
+      {selectedImprovement && (
+        <div className="roadmap-modal-overlay" onClick={() => setSelectedImprovement(null)}>
+          <div className="roadmap-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="roadmap-modal-header">
+              <span className="badge-priority" style={{
+                background: 'var(--primary)', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 'bold'
+              }}>
+                {selectedImprovement.priority} Priority
+              </span>
+              <button className="roadmap-modal-close" onClick={() => setSelectedImprovement(null)}>
+                <FaTimes />
+              </button>
+            </div>
+
+            <h3 style={{ marginBottom: '1rem', color: 'var(--text-main)', fontSize: '1.5rem' }}>
+              {selectedImprovement.action}
+            </h3>
+
+            <div style={{ marginTop: '1.5rem' }}>
+              <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold' }}>
+                <FaBolt /> Implementation Steps:
+              </h4>
+              <ul className="improvement-detail-list">
+                {selectedImprovement.details?.map((step, i) => (
+                  <li key={i}>{step}</li>
+                )) || <li>Detailed steps will appear here after specialized analysis.</li>}
+              </ul>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '2rem', textAlign: 'right' }}>
+              <button className="btn-primary" onClick={() => setSelectedImprovement(null)}>Close Action Plan</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div >
   );
 };
 

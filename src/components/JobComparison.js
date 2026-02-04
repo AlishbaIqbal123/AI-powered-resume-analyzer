@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { matchJobDescriptionWithAI } from '../services/aiService';
+import { matchKeywords } from '../services/resumeParser';
 import './JobComparison.css';
 
 const JobComparison = ({ resumeData }) => {
@@ -45,53 +45,19 @@ const JobComparison = ({ resumeData }) => {
     }
 
     setIsAnalyzing(true);
-    
+
     try {
       const results = [];
       for (const job of jobDescriptions) {
         try {
-          // Try to use the backend AI matching service first
-          try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/ai/match-jd`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                resumeData,
-                jobDescription: job.description
-              })
-            });
+          // Use centralized matchKeywords service (Backend -> Gemini)
+          const matchResult = await matchKeywords(resumeData, job.description);
 
-            if (response.ok) {
-              const data = await response.json();
-              results.push({
-                jobId: job.id,
-                jobTitle: job.title,
-                ...data.data
-              });
-            } else {
-              console.warn('Backend AI service failed for job:', job.id);
-              
-              // Fallback to direct API call
-              const directResult = await matchJobDescriptionWithAI(resumeData, job.description);
-              results.push({
-                jobId: job.id,
-                jobTitle: job.title,
-                ...directResult
-              });
-            }
-          } catch (backendError) {
-            console.warn('Backend AI service error for job:', job.id, backendError);
-            
-            // Fallback to direct API call
-            const directResult = await matchJobDescriptionWithAI(resumeData, job.description);
-            results.push({
-              jobId: job.id,
-              jobTitle: job.title,
-              ...directResult
-            });
-          }
+          results.push({
+            jobId: job.id,
+            jobTitle: job.title,
+            ...matchResult
+          });
         } catch (err) {
           console.error(`Error analyzing job ${job.id}:`, err);
           results.push({
@@ -101,7 +67,7 @@ const JobComparison = ({ resumeData }) => {
           });
         }
       }
-      
+
       setComparisonResults(results);
     } catch (error) {
       console.error('Error comparing jobs:', error);
@@ -142,8 +108,8 @@ const JobComparison = ({ resumeData }) => {
                 placeholder="e.g., Software Engineer, Product Manager"
               />
               {jobDescriptions.length > 1 && (
-                <button 
-                  className="remove-job-btn" 
+                <button
+                  className="remove-job-btn"
                   onClick={() => removeJobField(job.id)}
                   disabled={jobDescriptions.length <= 1}
                 >
@@ -151,7 +117,7 @@ const JobComparison = ({ resumeData }) => {
                 </button>
               )}
             </div>
-            
+
             <textarea
               value={job.description}
               onChange={(e) => updateJobDescription(job.id, e.target.value)}
@@ -175,7 +141,7 @@ const JobComparison = ({ resumeData }) => {
       {comparisonResults.length > 0 && (
         <div className="comparison-results">
           <h3>Comparison Results</h3>
-          
+
           <div className="results-grid">
             {comparisonResults.map((result, index) => (
               <div key={result.jobId} className="result-card">
@@ -189,7 +155,7 @@ const JobComparison = ({ resumeData }) => {
                     </div>
                   )}
                 </div>
-                
+
                 {result.error ? (
                   <div className="error-section">
                     <p>Error analyzing this job: {result.error}</p>
@@ -198,19 +164,19 @@ const JobComparison = ({ resumeData }) => {
                   <>
                     <div className="match-summary">
                       <p>
-                        <strong>Match Score:</strong> {result.matchPercentage}%<br/>
-                        <strong>Matched Keywords:</strong> {result.matched?.length || 0}<br/>
+                        <strong>Match Score:</strong> {result.matchPercentage}%<br />
+                        <strong>Matched Keywords:</strong> {result.matched?.length || 0}<br />
                         <strong>Missing Keywords:</strong> {result.missing?.length || 0}
                       </p>
                     </div>
-                    
+
                     <div className="progress-bar-container">
                       <div
                         className={`progress-bar ${getMatchLevel(result.matchPercentage)}`}
                         style={{ width: `${result.matchPercentage}%` }}
                       ></div>
                     </div>
-                    
+
                     <div className="keywords-section">
                       <div className="matched-keywords">
                         <h5>✅ Matched ({result.matched?.length || 0})</h5>
@@ -223,7 +189,7 @@ const JobComparison = ({ resumeData }) => {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="missing-keywords">
                         <h5>❌ Missing ({result.missing?.length || 0})</h5>
                         <div className="keyword-chips">
@@ -236,7 +202,7 @@ const JobComparison = ({ resumeData }) => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="recommendations">
                       <h5>💡 Recommendations</h5>
                       <ul>
@@ -253,7 +219,7 @@ const JobComparison = ({ resumeData }) => {
               </div>
             ))}
           </div>
-          
+
           {/* Summary section */}
           <div className="comparison-summary">
             <h3>Overall Summary</h3>
@@ -264,19 +230,19 @@ const JobComparison = ({ resumeData }) => {
                 </div>
                 <div className="stat-label">Jobs Analyzed</div>
               </div>
-              
+
               <div className="stat-card">
                 <div className="stat-value">
                   {Math.round(
                     comparisonResults
                       .filter(r => !r.error)
-                      .reduce((sum, r) => sum + r.matchPercentage, 0) / 
+                      .reduce((sum, r) => sum + r.matchPercentage, 0) /
                     comparisonResults.filter(r => !r.error).length
                   ) || 0}%
                 </div>
                 <div className="stat-label">Avg. Match Score</div>
               </div>
-              
+
               <div className="stat-card">
                 <div className="stat-value">
                   {comparisonResults
@@ -286,9 +252,9 @@ const JobComparison = ({ resumeData }) => {
                 <div className="stat-label">Good Matches</div>
               </div>
             </div>
-            
+
             <div className="best-match">
-              <h4>Top Match: 
+              <h4>Top Match:
                 <span className="top-match-name">
                   {comparisonResults
                     .filter(r => !r.error)
@@ -296,7 +262,7 @@ const JobComparison = ({ resumeData }) => {
                 </span>
               </h4>
               <p>
-                This position seems to align best with your current resume. 
+                This position seems to align best with your current resume.
                 Focus on this opportunity or consider adjusting your resume to better match other positions.
               </p>
             </div>

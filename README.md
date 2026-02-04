@@ -1,289 +1,138 @@
-# AI-Powered Resume Analyzer
+# Gemini-Powered Resume Analyzer
 
-A comprehensive resume analysis and optimization platform that leverages artificial intelligence to provide detailed insights, keyword matching, and personalized recommendations to improve job seekers' resumes.
+A sophisticated, AI-driven platform for automated resume evaluation, career strategy generation, and intelligent job matching.
 
-## 🚀 Features
+## 🚀 Core Capabilities
 
-- **Advanced Resume Parsing**: Supports PDF, DOCX, and TXT formats with intelligent content extraction
-- **AI-Powered Analysis**: Comprehensive evaluation using OpenAI GPT models
-- **Keyword Matching**: Compare resumes against job descriptions for better alignment
-- **Multi-Job Comparison**: Analyze resume fit across multiple job postings simultaneously
-- **Interactive Chatbot**: AI-powered career advisor for personalized guidance
-- **Professional Templates**: ATS-compatible resume templates
-- **Detailed Scoring**: Multi-dimensional scoring system covering ATS compliance, keyword alignment, content quality, and role relevance
-- **Export Functionality**: Export analysis reports in PDF, JSON, or DOCX formats
-- **User Authentication**: Secure user accounts with resume history tracking
+### 1. **Neural Resume Parsing**
+   - **Multi-Format Support**: Instantly processes PDF, DOCX, and TXT files.
+   - **Context-Aware Extraction**: Uses custom heuristic algorithms to detect complex academic headers (e.g., "Research Publications", "Academic Trajectory") alongside standard professional sections.
+   - **Noise Cancellation**: Automatically strips non-essential labels (e.g., "Responsibilities:", "Job Title:") to ensure clean, database-ready output.
 
-## 🏗️ Architecture
+### 2. **Professional DNA Analysis**
+   - **Deep-Dive Profiling**: Analyzes candidate data across 4 dimensions:
+     - **Technical Arsenal**: Hard skills, tools, and platforms.
+     - **Career Trajectory**: Chronological growth and impact assessment.
+     - **Academic Foundation**: Education, degrees, and specialized research.
+     - **Strategic Insights**: AI-generated strengths, weaknesses, and competitive advantages.
+   - **Role-Agnostic Intelligence**: Dynamically adapts analysis to any field (Engineering, Education, Mathematics, etc.) without bias.
 
-### Frontend (React)
-- **Components**: Modular component architecture with reusable UI elements
-- **State Management**: React hooks for local state management
-- **API Integration**: Direct communication with backend services
-- **Styling**: CSS modules with dark/light theme support
+### 3. **AI Career Coach (Gemini 2.5/3.0)**
+   - **Dual-Engine Architecture**: 
+     - **Primary**: Connects to Google's Gemini 2.0 Flash / 2.5 Flash for state-of-the-art reasoning.
+     - **Fallback**: Automatically switches to Gemma 3 models (27B/12B) during high-traffic periods to guarantee 100% uptime.
+   - **Project-Aware Guidance**: Provides advice grounded in your specific `Resume Data` and `Research Publications`.
 
-### Backend (Node.js/Express)
-- **API Endpoints**: RESTful API for all resume operations
-- **Database**: MongoDB for storing user data and resume analysis
-- **Vector Database**: Integrated vector storage for semantic search (simulated)
-- **AI Services**: Integration with OpenAI for analysis and recommendations
-- **File Processing**: PDF and DOCX parsing with text extraction
-
-## 🛠️ Tech Stack
-
-### Frontend
-- React 19.x
-- React Icons
-- PDF.js (for PDF parsing)
-- Mammoth (for DOCX parsing)
-
-### Backend
-- Node.js
-- Express.js
-- MongoDB/Mongoose
-- OpenAI API
-- Multer (file uploads)
-- PDF-Parser
-- Mammoth
-
-### AI & NLP
-- OpenAI GPT-4o-mini
-- Semantic search capabilities
-- Natural Language Processing
-
-## 📋 Installation
-
-### Prerequisites
-- Node.js 16.x or higher
-- MongoDB (local or cloud instance)
-- OpenAI API key
-
-### Setup Instructions
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd AI-powered-resume-analyzer
-```
-
-2. **Install frontend dependencies**
-```bash
-cd AI-powered-resume-analyzer
-npm install
-```
-
-3. **Setup backend**
-```bash
-cd server
-npm install
-```
-
-4. **Configure environment variables**
-
-Create a `.env` file in the `server` directory:
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-PORT=5000
-```
-
-Create a `.env` file in the frontend root directory:
-```env
-REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_OPENAI_API_KEY=your_openai_api_key_here
-```
-
-5. **Run the application**
-
-Start the backend server:
-```bash
-cd server
-npm start
-```
-
-In a new terminal, start the frontend:
-```bash
-npm start
-```
-
-## 🧪 Testing
-
-### Frontend Tests
-```bash
-npm test
-```
-
-### Backend Tests
-```bash
-cd server
-npm test
-```
-
-### Manual Testing Steps
-1. Upload a resume (PDF, DOCX, or TXT)
-2. Verify parsing accuracy
-3. Check AI analysis results
-4. Test keyword matching with job descriptions
-5. Verify export functionality
-6. Test chatbot interactions
-7. Validate responsive design across devices
-
-## 🚀 Deployment
-
-### Frontend Deployment (Vercel/Netlify)
-```bash
-npm run build
-# Deploy the build folder to your hosting platform
-```
-
-### Backend Deployment (Railway/Render)
-1. Push code to GitHub
-2. Connect your repository to the deployment platform
-3. Configure environment variables
-4. Deploy the application
-
-### Docker Deployment
-```dockerfile
-# Dockerfile for backend
-FROM node:18-alpine
-WORKDIR /app
-COPY server/package*.json ./
-RUN npm install
-COPY server/ .
-EXPOSE 5000
-CMD ["npm", "start"]
-```
-
-## 🔧 API Endpoints
-
-### Resume Operations
-- `POST /api/resume/upload` - Upload and parse resume
-- `POST /api/resume/analyze` - Analyze resume with AI
-- `POST /api/resume/match-keywords` - Match keywords with job description
-
-### AI Services
-- `POST /api/ai/advice` - Get resume advice from AI
-- `POST /api/ai/analyze` - Perform detailed AI analysis
-- `POST /api/ai/match-jd` - Match resume with job description
-
-### User Management
-- `POST /api/users/register` - Register new user
-- `POST /api/users/login` - User login
-- `GET /api/users/profile` - Get user profile
-
-## 📊 Scoring System
-
-The application uses a comprehensive scoring system:
-
-- **ATS Compatibility (0-30)**: How well the resume passes through applicant tracking systems
-- **Keyword Match (0-30)**: Alignment with job requirements and industry keywords
-- **Content Quality (0-20)**: Writing quality, achievements, and impact statements
-- **Role Relevance (0-20)**: Fit for the target role and industry
-
-## 🤖 AI Capabilities
-
-### Resume Analysis
-- Extract structured data from unstructured resume content
-- Identify strengths and weaknesses
-- Provide personalized recommendations
-- Assess ATS compatibility
-
-### Job Matching
-- Compare resume against job descriptions
-- Identify missing keywords
-- Recommend improvements for specific roles
-
-### Conversational AI
-- Interactive chatbot for resume guidance
-- Context-aware recommendations
-- Personalized feedback
-
-## 📁 Project Structure
-
-```
-AI-powered-resume-analyzer/
-├── public/                 # Static assets
-├── src/
-│   ├── components/         # React components
-│   │   ├── Chatbot/        # Chatbot functionality
-│   │   ├── AIAnalysisEngine.js
-│   │   ├── Dashboard.js
-│   │   ├── KeywordMatcher.js
-│   │   ├── ResumeUpload.js
-│   │   ├── Sidebar.js
-│   │   └── ...
-│   ├── config/             # Configuration files
-│   ├── services/           # API services
-│   │   ├── aiService.js
-│   │   └── resumeParser.js
-│   ├── utils/              # Utility functions
-│   └── App.js
-├── server/                 # Backend server
-│   ├── routes/             # API routes
-│   ├── models/             # Database models
-│   ├── services/           # Business logic
-│   ├── middleware/         # Authentication, etc.
-│   ├── utils/              # Utility functions
-│   └── server.js
-├── package.json
-└── README.md
-```
-
-## 💡 Usage Tips
-
-1. **For Best Results**:
-   - Use clear, well-formatted resumes
-   - Include quantifiable achievements
-   - Tailor content to specific job descriptions
-
-2. **Maximizing ATS Score**:
-   - Use standard section headings
-   - Avoid graphics and complex formatting
-   - Include relevant keywords from job postings
-
-3. **Improving Content Quality**:
-   - Use action verbs
-   - Quantify achievements with numbers
-   - Focus on results rather than responsibilities
-
-## 🔒 Security Considerations
-
-- Passwords are hashed using bcrypt
-- JWT tokens for authentication
-- Input validation and sanitization
-- Secure file upload handling
-- Rate limiting for API endpoints
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🎯 Future Enhancements
-
-- Integration with LinkedIn profiles
-- Resume builder with drag-and-drop interface
-- Multi-language support
-- Integration with job boards
-- Team collaboration features
-- Advanced analytics dashboard
-- Mobile application
-- Email notifications
-- Integration with calendar apps for interview scheduling
-
-## 🆘 Support
-
-For support, please open an issue in the repository or contact the development team.
+### 4. **Smart Job Matching**
+   - **Semantic Comparison**: Goes beyond simple keyword matching to understand the *intent* of a job description.
+   - **Actionable Roadmap**: Generates a concrete 8-step plan to bridge the gap between your resume and the target role.
 
 ---
 
-Built with ❤️ for job seekers everywhere!
+## 🛠️ Technical Architecture
+
+### **Frontend (Smart Interface)**
+- **Framework**: React 18+ (Hooks-based architecture)
+- **Styling**: 
+  - **Dynamic Theme Engine**: Full support for Light/Dark modes with CSS Variables.
+  - **Glassmorphism**: Premium UI with translucent cards and smooth gradients.
+- **State Management**: Context API for global state (Theme, User Data).
+
+### **Backend (Intelligence Core)**
+- **Runtime**: Node.js / Express
+- **AI Integration**: Google Generative AI SDK (Gemini 2.0/2.5/3.0)
+- **Database (Optional)**: MongoDB (for persistent user profiles)
+- **Security**: 
+  - Environmental variable protection (`.env`)
+  - Rate-limit handling with intelligent backoff strategies.
+
+---
+
+## 📋 Quick Start Guide
+
+### **1. Prerequisites**
+- Node.js (v16+)
+- A Google Gemini API Key (Get one at [Google AI Studio](https://aistudio.google.com/))
+
+### **2. Installation**
+
+#### **Step A: Clone & Install**
+```bash
+git clone https://github.com/Start-Up-Pulse/AI-powered-resume-analyzer.git
+cd AI-powered-resume-analyzer
+npm install
+```
+
+#### **Step B: Configure Backend**
+1. Navigate to the server folder:
+   ```bash
+   cd server
+   npm install
+   ```
+2. Create a `.env` file in `server/`:
+   ```env
+   PORT=5000
+   GEMINI_API_KEY=AIzaSyAasn5HUw23mUH9kUoK2zwCocV2VkNzbRk
+   ```
+
+### **3. Launch**
+
+**Terminal 1 (Backend - The Brain)**
+```bash
+cd server
+npm start
+```
+*You should see: `ResumeParser Service initialized. API Key Present: true`*
+
+**Terminal 2 (Frontend - The Interface)**
+```bash
+# In the root folder
+npm start
+```
+*The app will open at `http://localhost:3000`*
+
+---
+
+## 💡 Usage Tips
+
+### **IMPORTANT: Switching Resumes**
+⚠️ **Critical Step**: If you want to analyze a different resume (e.g., switching from a Developer CV to an HR CV), please **REFRESH THE PAGE** before uploading the new file. This ensures the dashboard clears all previous data and resets the AI analysis engine for a fresh start.
+
+---
+
+## 🔒 Safe Deployment Guide (Vercel + GitHub)
+
+To keep your project secure and your API keys private on a public GitHub repo, follow these steps:
+
+### **1. Secure Your Local Environment**
+- I have updated the `.gitignore` to ensure `.env` files are **never** uploaded to GitHub.
+- Your keys will stay local on your computer.
+
+### **2. Deploying to Vercel**
+1. **Push your code**: Upload your project to GitHub (it's safe, the keys won't go with it).
+2. **Connect to Vercel**: Create a new project in Vercel and link it to your GitHub repo.
+3. **Configure Environment Variables**:
+   - In the Vercel Dashboard, go to **Settings > Environment Variables**.
+   - Add your keys exactly as they appear in your `.env`:
+     - `GEMINI_API_KEY`: `AIzaSy...`
+     - `PORT`: `5000` (or your preferred server port)
+4. **Build & Deploy**: Vercel will now use these secure "Cloud Variables" instead of reading from a file, keeping your account 100% safe.
+
+---
+
+## 🔍 Key Features in Detail
+
+| Feature | Description | Tech Stack |
+| :--- | :--- | :--- |
+| **Role Precision** | Smart UI that auto-adjusts scores (High/Medium/Low) based on verbose AI analysis. | React Logic |
+| **Parsing Engine** | Hybrid AI + Regex system to handle "messy" PDF layouts. | PDF.js + Custom Regex |
+| **Theme System** | One-click toggle between "Professional Dark" and "Clean Light" modes. | CSS Variables |
+
+---
+
+## 🤝 Contributing
+We welcome contributions! Please fork the repo and submit a PR for any features, bug fixes, or documentation improvements.
+
+---
+
+**Built with ❤️ by the Internee.pk Team**

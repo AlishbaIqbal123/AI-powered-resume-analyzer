@@ -1,23 +1,24 @@
-import React from 'react';
-import { FaCloudUploadAlt, FaChartBar, FaBalanceScale, FaHome, FaLock, FaRocket, FaSun, FaMoon, FaDraftingCompass } from 'react-icons/fa';
+import { FaCloudUploadAlt, FaChartBar, FaBalanceScale, FaHome, FaLock, FaRocket, FaSun, FaMoon, FaTimes } from 'react-icons/fa';
 import './Sidebar.css';
 
-const Sidebar = ({ currentView, setCurrentView, hasData, toggleTheme, theme }) => {
+const Sidebar = ({ currentView, setCurrentView, hasData, toggleTheme, theme, isOpen, onClose }) => {
     const menuItems = [
         { id: 'upload', label: 'Resume Upload', icon: <FaCloudUploadAlt /> },
         { id: 'analysis', label: 'AI Analysis', icon: <FaChartBar />, requireData: true },
         { id: 'matching', label: 'JD Matching', icon: <FaBalanceScale />, requireData: true },
-        { id: 'dashboard', label: 'Dashboard', icon: <FaHome />, requireData: true },
-        { id: 'templates', label: 'Smart Templates', icon: <FaDraftingCompass />, requireData: true, locked: true },
+        { id: 'dashboard', label: 'Dashboard', icon: <FaHome />, requireData: true }
     ];
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 <div className="logo">
                     <span className="logo-icon"><FaRocket /></span>
                     <span className="logo-text">AI Parser</span>
                 </div>
+                <button className="sidebar-close-btn" onClick={onClose}>
+                    <FaTimes />
+                </button>
             </div>
 
             <nav className="sidebar-nav">

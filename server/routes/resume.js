@@ -20,12 +20,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf' || 
-        file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        file.mimetype === 'text/plain') {
+    if (file.mimetype === 'application/pdf' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.mimetype === 'text/plain') {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only PDF, DOCX, and TXT files are allowed.'));
@@ -36,10 +36,11 @@ const upload = multer({
   }
 });
 
-// Import resume parser service
-const { parseResume, analyzeResume, matchKeywords } = require('../services/resumeParser');
+// Import services
+const { parseResume, analyzeResume, matchKeywords, getResumeAdvice } = require('../services/resumeParser');
+// Optional: Use a mock or skip DB if connection failed
 const Resume = require('../models/Resume');
-const auth = require('../middleware/auth'); // Assuming we'll create this
+const auth = require('../middleware/auth');
 
 // POST endpoint to upload and parse resume
 router.post('/upload', upload.single('resume'), async (req, res) => {
@@ -75,17 +76,22 @@ router.post('/upload', upload.single('resume'), async (req, res) => {
       content: fileContent
     });
 
-    // Save resume to database
-    const newResume = new Resume({
-      userId: req.user ? req.user.id : null, // Assuming user is authenticated
-      fileName: req.file.originalname,
-      fileSize: req.file.size,
-      fileType: req.file.mimetype,
-      originalContent: fileContent,
-      extractedData: parsedResume.extractedData
-    });
-
-    await newResume.save();
+    // Save resume to database (gracefully handle failures if DB is in limited mode)
+    let savedResumeId = null;
+    try {
+      const newResume = new Resume({
+        userId: req.user ? req.user.id : null,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        fileType: req.file.mimetype,
+        originalContent: fileContent,
+        extractedData: parsedResume.extractedData
+      });
+      await newResume.save();
+      savedResumeId = newResume._id;
+    } catch (dbError) {
+      console.warn('Database save failed, continuing in limited mode:', dbError.message);
+    }
 
     // Clean up uploaded file
     fs.unlinkSync(filePath);
@@ -94,7 +100,7 @@ router.post('/upload', upload.single('resume'), async (req, res) => {
       success: true,
       data: {
         ...parsedResume,
-        _id: newResume._id // Include the database ID
+        _id: savedResumeId
       }
     });
   } catch (error) {
@@ -116,9 +122,13 @@ router.post('/analyze', async (req, res) => {
 
     // Update the resume document in the database with analysis results
     if (resumeData._id) {
-      await Resume.findByIdAndUpdate(resumeData._id, {
-        analysisResults: analysis
-      });
+      try {
+        await Resume.findByIdAndUpdate(resumeData._id, {
+          analysisResults: analysis
+        });
+      } catch (dbError) {
+        console.warn('Database update failed for analysis, continuing:', dbError.message);
+      }
     }
 
     res.json({
@@ -144,9 +154,13 @@ router.post('/match-keywords', async (req, res) => {
 
     // Update the resume document in the database with keyword matching results
     if (resumeData._id) {
-      await Resume.findByIdAndUpdate(resumeData._id, {
-        keywordMatches: matchResults
-      });
+      try {
+        await Resume.findByIdAndUpdate(resumeData._id, {
+          keywordMatches: matchResults
+        });
+      } catch (dbError) {
+        console.warn('Database update failed for keyword matching, continuing:', dbError.message);
+      }
     }
 
     res.json({
@@ -155,6 +169,27 @@ router.post('/match-keywords', async (req, res) => {
     });
   } catch (error) {
     console.error('Error matching keywords:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST endpoint to get AI advice/chat
+router.post('/advice', async (req, res) => {
+  try {
+    const { message, resumeData, analysisResults } = req.body;
+
+    if (!message || !resumeData) {
+      return res.status(400).json({ error: 'Message and resume data are required' });
+    }
+
+    const advice = await getResumeAdvice(message, resumeData, analysisResults);
+
+    res.json({
+      success: true,
+      data: advice
+    });
+  } catch (error) {
+    console.error('Error getting AI advice:', error);
     res.status(500).json({ error: error.message });
   }
 });
