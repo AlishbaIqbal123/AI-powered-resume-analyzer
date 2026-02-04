@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  FaCloudUploadAlt, FaCheckCircle, FaUser,
-  FaEnvelope, FaPhone, FaMapMarkerAlt,
+  FaCloudUploadAlt, FaCheckCircle,
+  FaPhone, FaMapMarkerAlt,
   FaFingerprint, FaShieldAlt, FaArrowRight
 } from 'react-icons/fa';
 import { parseResume } from '../services/resumeParser';

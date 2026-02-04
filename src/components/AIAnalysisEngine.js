@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaCheckCircle, FaExclamationTriangle, FaLightbulb, FaDraftingCompass, FaChartLine, FaSearch, FaUserTie } from 'react-icons/fa';
+import { FaCheckCircle, FaExclamationTriangle, FaLightbulb, FaChartLine, FaSearch, FaUserTie } from 'react-icons/fa';
 import { analyzeResume } from '../services/resumeParser';
 import './AIAnalysisEngine.css';
 

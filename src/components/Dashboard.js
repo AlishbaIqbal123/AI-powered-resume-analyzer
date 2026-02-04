@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FaChartLine, FaBrain, FaRocket, FaShieldAlt,
-  FaCheckCircle, FaExclamationCircle, FaBolt,
+  FaBolt,
   FaDownload, FaLayerGroup, FaMagic, FaTimes
 } from 'react-icons/fa';
 import ChatbotContainer from './Chatbot/ChatbotContainer';

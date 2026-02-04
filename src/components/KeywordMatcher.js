@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaBullseye, FaCheckCircle, FaExclamationCircle, FaTerminal, FaMagic, FaHistory } from 'react-icons/fa';
+import { FaBullseye, FaCheckCircle, FaExclamationCircle, FaTerminal, FaMagic } from 'react-icons/fa';
 import { matchKeywords } from '../services/resumeParser';
 import './KeywordMatcher.css';
 
