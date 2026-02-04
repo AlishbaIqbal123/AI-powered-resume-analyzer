@@ -4,7 +4,7 @@ import AIAnalysisEngine from './components/AIAnalysisEngine';
 import KeywordMatcher from './components/KeywordMatcher';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
-import { FaFingerprint, FaShieldAlt, FaRocket, FaBullseye, FaDraftingCompass, FaBars } from 'react-icons/fa';
+import { FaFingerprint, FaShieldAlt, FaRocket, FaBullseye, FaBars } from 'react-icons/fa';
 import './App.css';
 
 function App() {
