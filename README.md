@@ -9,6 +9,8 @@ A sophisticated, full-stack application that leverages **Google's Gemini 2.5 Fla
 ---
 
 ## 📸 Project Screenshots
+<img width="1919" height="922" alt="image" src="https://github.com/user-attachments/assets/bf36b70a-5717-4bd9-a515-b1d052e03b67" />
+
 <img width="1919" height="930" alt="Screenshot 2026-02-05 004626" src="https://github.com/user-attachments/assets/ae263a13-0ff2-4243-86f0-87327ab7dee8" />
 <img width="1919" height="931" alt="Screenshot 2026-02-05 004645" src="https://github.com/user-attachments/assets/202c4898-a899-4c2d-8c34-b61b02c5491a" />
 <img width="1919" height="924" alt="Screenshot 2026-02-05 004737" src="https://github.com/user-attachments/assets/1070ecb1-abb2-422a-a6f6-36d52989e9cb" />
