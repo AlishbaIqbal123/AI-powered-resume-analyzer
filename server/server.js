@@ -1,29 +1,24 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const connectDB = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Attempt to connect to database
+// Optional database connection (won't crash if it fails)
+const connectDB = require('./config/db');
 connectDB().catch(err => {
-  console.error('Database connection failed:', err.message);
-  console.log('Server will run in limited mode without persistent storage');
+  console.warn('Database unavailable, running in stateless mode:', err.message);
 });
 
 // Middleware
 app.use(cors({
-  origin: '*', // Allows all origins, including and deployment URLs
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true
 }));
 
-// Handle preflight requests
 app.options('*', cors());
 
 app.use(express.json({ limit: '50mb' }));
@@ -31,7 +26,18 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ message: 'AI Resume Analyzer Backend is running!' });
+  res.json({
+    message: 'AI Resume Analyzer Backend is running!',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'API is ready',
+    endpoints: ['/api/resume', '/api/ai', '/api/users']
+  });
 });
 
 // Import route handlers
@@ -44,11 +50,13 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 
-
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Error:', err.message);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message
+  });
 });
 
 // 404 handler
@@ -56,8 +64,11 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Only listen in non-serverless environments
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 module.exports = app;

@@ -2,7 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+
+// Safe model loading
+let User;
+try {
+  User = require('../models/User');
+} catch (err) {
+  console.warn('User model unavailable:', err.message);
+}
 
 // POST endpoint to register a new user
 router.post('/register', async (req, res) => {

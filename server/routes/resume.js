@@ -27,8 +27,21 @@ const upload = multer({
 
 // Import services
 const { parseResume, analyzeResume, matchKeywords, getResumeAdvice } = require('../services/resumeParser');
-const Resume = require('../models/Resume');
-const auth = require('../middleware/auth');
+
+// Safe model loading
+let Resume;
+try {
+  Resume = require('../models/Resume');
+} catch (err) {
+  console.warn('Resume model unavailable:', err.message);
+}
+
+let auth;
+try {
+  auth = require('../middleware/auth');
+} catch (err) {
+  console.warn('Auth middleware unavailable:', err.message);
+}
 
 // POST endpoint to upload and parse resume
 router.post('/upload', upload.single('resume'), async (req, res) => {

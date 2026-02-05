@@ -1,9 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const { generateResumeAdvice, analyzeResumeWithAI, matchJobDescriptionWithAI, parseStructuredDataWithAI } = require('../services/aiService');
-const ragService = require('../services/ragService');
-const Resume = require('../models/Resume');
-const auth = require('../middleware/auth');
+
+// Safe imports
+let ragService, Resume, auth;
+try {
+  ragService = require('../services/ragService');
+} catch (err) {
+  console.warn('RAG service unavailable:', err.message);
+}
+
+try {
+  Resume = require('../models/Resume');
+} catch (err) {
+  console.warn('Resume model unavailable:', err.message);
+}
+
+try {
+  auth = require('../middleware/auth');
+} catch (err) {
+  console.warn('Auth middleware unavailable:', err.message);
+}
 
 // POST endpoint to generate resume advice
 router.post('/advice', async (req, res) => {
@@ -14,8 +31,8 @@ router.post('/advice', async (req, res) => {
       return res.status(400).json({ error: 'Message and resume data are required' });
     }
 
-    // Try RAG-based response first if OpenAI is available
-    if (process.env.OPENAI_API_KEY) {
+    // Try RAG-based response first if OpenAI is available and ragService loaded
+    if (process.env.OPENAI_API_KEY && ragService) {
       try {
         const ragAdvice = await ragService.generateResponse(message, resumeData, analysisResults);
         res.json({
@@ -53,12 +70,12 @@ router.post('/analyze', async (req, res) => {
     const analysis = await analyzeResumeWithAI(resumeData);
 
     // Index resume in vector database for RAG
-    if (resumeData._id && process.env.OPENAI_API_KEY) {
+    if (resumeData._id && process.env.OPENAI_API_KEY && ragService) {
       try {
         await ragService.indexResume(
-          resumeData.userId || 'anonymous', 
-          resumeData._id, 
-          resumeData.rawText, 
+          resumeData.userId || 'anonymous',
+          resumeData._id,
+          resumeData.rawText,
           resumeData.extractedData
         );
       } catch (indexError) {
