@@ -1,4 +1,4 @@
-<img width="1919" height="925" alt="Screenshot 2026-02-05 005554" src="https://github.com/user-attachments/assets/3048ba43-3841-4317-98cf-8f3b37dc63b0" /># 🚀 AI-Powered Resume Analyzer
+# 🚀 AI-Powered Resume Analyzer
 
 A sophisticated, full-stack application that leverages **Google's Gemini 2.5 Flash** and **Gemini 3 Flash** models to deconstruct resumes, provide elite career coaching, and match candidates with job descriptions using semantic analysis.
 
@@ -33,7 +33,7 @@ A sophisticated, full-stack application that leverages **Google's Gemini 2.5 Fla
 <img width="1919" height="925" alt="Screenshot 2026-02-05 010256" src="https://github.com/user-attachments/assets/212d86f0-3fd8-4465-92d1-b5efefdb5c7e" />
 <img width="1919" height="924" alt="Screenshot 2026-02-05 010311" src="https://github.com/user-attachments/assets/ccbc1bb4-686a-4107-b1a7-15270e0da2e8" />
 <img width="1919" height="931" alt="Screenshot 2026-02-05 010329" src="https://github.com/user-attachments/assets/1eef102f-fa3b-44f1-9596-948db2f325c7" />
-
+<img width="1919" height="925" alt="Screenshot 2026-02-05 005554" src="https://github.com/user-attachments/assets/3048ba43-3841-4317-98cf-8f3b37dc63b0" />
 ## ✨ Key Features
 
 
