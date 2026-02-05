@@ -43,12 +43,12 @@ const callGemini = async (prompt, systemPrompt = EXPERT_SYSTEM_PROMPT, isJson = 
   };
 
   const models = [
+    { name: "gemini-2.5-flash", version: "v1beta" },
+    { name: "gemini-3-flash", version: "v1beta" },
     { name: "gemini-2.0-flash-exp", version: "v1beta" },
     { name: "gemini-1.5-flash", version: "v1beta" },
     { name: "gemini-1.5-flash-latest", version: "v1beta" },
-    { name: "gemini-1.5-pro", version: "v1beta" },
-    { name: "gemini-1.5-pro-latest", version: "v1beta" },
-    { name: "gemini-pro", version: "v1beta" }
+    { name: "gemini-1.5-pro", version: "v1beta" }
   ];
   let lastError;
 
