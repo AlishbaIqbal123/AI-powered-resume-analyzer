@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import ResumeUpload from './components/ResumeUpload';
 import AIAnalysisEngine from './components/AIAnalysisEngine';
 import KeywordMatcher from './components/KeywordMatcher';
@@ -99,6 +100,7 @@ function App() {
           <p>PROPRIETARY INTELLIGENCE SYSTEM • v2.0.0 • POWERED BY GEMINI 2.0 FLASH</p>
         </footer>
       </main>
+      <Analytics />
     </div>
   );
 }
